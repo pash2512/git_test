@@ -1,0 +1,2002 @@
+------------------------------------------------------------------------
+
+---
+title: "SOK-1004, høst 2023, Mappeoppgave"
+author: "[30]"
+format: pdf
+echo: false
+output: true
+editor: visual
+---
+
+# 1. Bakgrunn
+
+Denne mappeoppgaven er et prosjekt i samarbeid med Mediahuset iTromsø AS som vi takker for dataene!
+
+**NB.** For a få datafilene må du
+
+-   undertegne en [databehandlingsavtale](https://github.com/uit-sok-1004-h23/uit-sok-1004-h23.github.io/blob/main/eksamen/Databehandlingsavtale.docx)
+
+-   send den signerte avtalen til meg per [e-post](mailto:derek.clark@uit.no).
+
+Jeg vil sende deg en zipfil med 5 csv filer med data. Vi skal også bruke disse dataene i prosjektoppgaven.
+
+Her finner du noen [beskrivelser](https://github.com/uit-sok-1004-h23/uit-sok-1004-h23.github.io/blob/main/eksamen/Datasettet%20fra%20i%20Troms%C3%B8.pdf) som følgte med datasettet. Les dette!
+
+I denne mappeoppgaven skal dere undersøke fordelingen av inntekt og formue i Tromsø kommune 2016-2020, og lage en avisartikkel basert på funnene. iTromsø har hatt fokus på tematikken i serien [Byen vår](https://www.itromso.no/emne/byen-vaar/).
+
+# 2. Instruksjoner og oppgaver
+
+Mappeoppgaven kan besvares individuelt eller i grupper på inntil 3. Grupper anbefales å undertegne en [samarbeidsavtale](https://github.com/uit-sok-1004-h23/uit-sok-1004-h22.github.io/blob/main/eksamen/Samarbeidsavtale%20for%20gruppearbeid%20SOK1004.pdf). Det er tillatt å bruke kunstig intelligens som for eksempel ChatGPT til å skrive kode, og til å finpusse din tekst. Det er ikke tillatt å be KI-verktøyet om å skrive din besvarelse. (Besvarelser blir lest inn i en KI sjekker). Dersom du bruker et KI verktøy [**må**]{.underline} du lage et appendiks til din besvarelse som dokumenterer hvor i besvarelsen og hvordan du har brukt det. Her finner du noen tips om hvordan man kan [sitere KI](https://apastyle.apa.org/blog/how-to-cite-chatgpt).
+
+Bruk [Quarto](https://quarto.org/) i RStudio som plattform.
+
+I Wiseflow skal dere levere
+
+1.  en Quarto (qmd) fil som viser din besvarelse inkludert kode, og
+
+2.  en pdf fil som inneholder din besvarelse med tekst og figurer (ikke kode). Bruk følgende YAML kode øverst i Quarto dokumentet
+
+\-\--
+
+title: "SOK-1004, høst 2023, Mappeoppgave"
+
+author:
+
+format: pdf
+
+echo: false
+
+output: true
+
+editor: visual
+
+\-\--
+
+## Oppgave 1 - Last inn data
+
+Dere har fått 5 filer som heter TAX så et årstall og .csv. La oss lese dem inn og kombinere i en tibble. Vi vil legge til en kolonne som viser hvilket årstall observasjonen tilhører. Pass på at din "working directory" peker til mappa hvor du har lagret filene.
+
+```{r warning=FALSE, message=FALSE}
+rm(list=ls()) 
+library(tidyverse)
+
+# Vi lager ei liste med filnavn
+file_names <- paste0("TAX", 2016:2020, ".csv")
+
+# Lag en funksjon for å lese ei fil samt legge til årstall
+read_and_add_year <- function(file, year) {
+  data <- read_csv(file)
+  data$year <- year
+  return(data)
+}
+
+# Bruk mapply for å lese hver fil, tillegge kolonne med årstall, og sette dem sammen
+all_data <- mapply(read_and_add_year, file=file_names, year=2016:2020, SIMPLIFY=FALSE) %>%
+  bind_rows()
+
+# Pass på at datasettet er en tibble
+all_data <- as_tibble(all_data)
+
+
+```
+
+Som vi ser i beskrivelsen av datasettet er noen postnummer feilspesifisert. Følgende kode endrer postnummer med 2 og 3 siffer til fire siffer (med 0 foran tallet).
+
+```{r}
+
+all_data <- all_data %>%
+  mutate(POSTNUMBER = ifelse(nchar(POSTNUMBER) %in% c(2,3), 
+                             sprintf("%04d", as.numeric(POSTNUMBER)),
+                             POSTNUMBER))
+
+```
+
+Vi lagrer vårt datasett lokalt:
+
+```{r}
+# lagre data lokalt
+
+# som csv
+
+write_csv(all_data, "combined_tax_data.csv")
+
+# eller som RDS
+
+saveRDS(all_data, "combined_tax_data.rds")
+
+```
+
+```{r}
+
+
+
+#Navnendring av kolonner i data-settet. Ønskelig med å benytte det Norske språket,  isteden for Engelsk. 
+
+#Lage en variabel med oversatte navn. 
+
+navnendring_kolonne <-
+  c("Fødselsdato", 
+  "Status", 
+  "Inntekt", 
+  "Skatt",
+  "Formue", 
+  "Nationalitet",
+  "Fylke", 
+  "Kommune",
+  "Postnummer",
+  "ID", 
+  "År")
+
+#Endring av navn. 
+
+all_data <- readRDS("combined_tax_data.rds")
+colnames(all_data) <- navnendring_kolonne
+
+
+
+
+```
+
+```{r}
+
+
+# KPI verdier for å lage ny dataframe.
+
+År <- c(2016, 2017, 2018, 2019, 2020)
+KPI_verdi <- c(103.6, 105.5, 108.4, 110.8, 112.2)
+
+KPI <- data_frame(År, KPI_verdi) 
+
+```
+
+```{r}
+
+#Postnummer som referer til en geografisk lokasjon i Tromsøby.
+
+postnummer = c(9006,9006,9007,9007,9008,9008,9009,9009,9010,9010,9011,9011,9012,9012,9013
+,9013,9014,9014,9015,9015,9016,9016,9017,9017,9018,9018,9019,9019,9020,9020
+,9021,9021,9022,9022,9023,9023,9024,9024,9027,9027,9030,9030,9034
+,9034,9043,9043,9057,9057,9100,9100,9101,9101,9102,9102,9103,9103,9104,9104
+,9105,9105,9106,9106,9107,9107,9108,9108,9109,9110,9110,9118,9118,9120,9120,9128,9128,9131,9131,9141)
+
+ postnummer_tromsø.u.postbokser<- as_tibble(postnummer) %>% 
+  mutate(Postnummer = value) %>% 
+   select(Postnummer) %>%
+   distinct() #Flere av postnummerne er doble.
+ 
+
+```
+
+## Oppgave 2 - Datavisualisering
+
+Her skal du utforske datasettet, tegne figurer og beskrive dem. Vi har årlig data for 2016-2020 om alder, bosted, årstall, samt økonomisk data om inntekt, skatt og formue. Det viser seg at det er mange personer i datasettet som har 0 i inntekt, skatt og formue. Det er også noen observasjoner med postnummer 0. Du kan vurdere å fjerne disse fra datasettet (forklar gjerne hvorfor).
+
+1.  Lag en ny variabel som viser inntekt etter skatt, og fjern negative verdier (forklar gjerne hvorfor).
+
+2.  Beregn gjennomsnittet for de økonomiske variablene (inntekt, inntekt etter skatt, skatt og formue).
+
+3.  Undersøk hvordan gjennomsnittene er i forhold til alder, bosted og over tid. Du kan for eksempel se på geografisk inndeling av postnummer [i denne oversikten](https://www.erikbolstad.no/postnummer-koordinatar/kommune.php?kommunenummer=5401). Alder kan deles inn i flere kategorier. Velg en passende inndeling, og undersøk hvordan gjenomsnittsverdiene har endret seg mellom 2016 og 2020. Tegn pene figurer og forklar hva de viser.
+
+4.  For 2016-2020 bruk dine figurer for å se på i) om det er noen aldersgrupper som har hatt særlig stor endring i gjennomsnittsverdiene, og ii) om det er store geografiske forskjeller i gjennomsnittsverdiene.
+
+## Oppgave 3 - Fattigdom
+
+Vi skal nå se på relativ fattigdom. Les [denne artikkelen fra SSB](https://www.ssb.no/inntekt-og-forbruk/inntekt-og-formue/artikler/hvor-mange-er-fattige-i-norge). Her forklares blant annet hvordan man bergner andelen av befolkningen som har lavinntekt.
+
+1.  For hvert år beregn medianinntekten, og 60% av medianinntekten. Bergen også hvor stor andel av ditt utvalg som har inntekt under dette nivået. Plott i en pen figur og forklar hva den viser.
+
+2.  I artikkelen ovennfor beregner SSB et "lavinntektsgap". For hvert år beregn størrelsen på lavinntektsgapet, plott i en pen figur og forklar hva den viser.
+
+3.  Undersøk om det er noen spesifikke alderskategorier og geografiske områder som er spesielt representert i gruppa som har lavinntekt over tid. Lage gjerne en pen figur for å illustrere dine funn. Forklar hva figuren viser.
+
+## Oppgave 4 - Avisartikkel
+
+Basert på dine funn skriv en avisartikkel på ca 750 ord. Finn din egen vinkling på historien som du vil fortelle basert på datasettet som du har beskrevet og undersøkt. Du kan gjerne illustrere med en fin figur eller to, men pass på at du forklarer veldig godt for leseren!
+
+# 3. Bedømmelse
+
+Denne mappeoppgaven teller 40% av karakteren for dette kurset.
+
+Formålet med oppgaven er å gi dere trening i å
+
+-   skrive godt og tydelig
+
+-   anvende data og lage figurer
+
+-   nytte grunnleggende samfunnsøkonomiske begrep og teori
+
+-   være kreativ i å finne og skrive om en samfunnsøkonomisk problemstilling basert på data.
+
+En god besvarelse svarer konkret på oppgavene, gir tydelige definisjoner av faglige begrep, og forklarer utfyllende innholdet i figurene som dere lager. R-koden bør være godt dokumentert og oversiktlig.
+
+# 4. Tilbakemelding underveis
+
+**Innleveringsfristen i Wiseflow: 13. oktober kl 13.00**
+
+Dere vil få anledning til å levere oppgaven til Derek én gang og få tilbakemelding. Utkast sendes per e-post ([derek.clark\@uit.no](mailto:derek.clark@uit.no)) innen mandag 9. oktober klokken 09.00. Besvarelser som sendes etter fristen blir ikke kommentert.
+
+Lykke til!
+
+# **OPPGAVE 2:**
+
+## Oppgave 2.1:
+
+```{r}
+
+
+#Oppgave 2.1 code:
+
+Tromsø_innbygger_register <- all_data %>% 
+  mutate(Inntekt_etter_skatt = Inntekt-Skatt, #valgt å lage 2 nye kolonner i datasettet. 
+         Alder = År - Fødselsdato,
+         Postnmr = Postnummer) %>% #Problemer med å benytte følgende kolonne,  slettet og lagde en ny isteden. 
+  subset(select = -Postnummer) %>% 
+  filter(Inntekt_etter_skatt > 0, # filtering  av kun individer med inntekt etter skatt som er større enn 0.
+         Postnmr %in% postnummer_tromsø.u.postbokser$Postnummer ) #Filterering av postnummer som forekommer i angitt fil.
+
+Tromsø_innbygger_register
+
+```
+
+### Løsning:
+
+Jeg har opprettet en ny datasett, "Tromsø_innbygger_register," der jeg har valgt å kun inkludere data fra bostedsinnbyggere i Tromsø kommune. Dette innebærer å ekskludere data fra personer som ikke har gateadressert postnummer i Tromsø kommune. Begrunnelsen for dette er å oppnå klarere datainnsyn for innbyggerne i kommunen med tilknytning til et geografisk bosted, slik at vi kan utføre videre økonomiske analyser. Ved å begrense datasettet til følgende data, får vi bedre innsikt i mikro- og makroøkonomiske grunnlaget i sammenlignbar data fra andre postnummer og regioner som omfatter kommunen.
+
+I datasettet har jeg også valgt å ekskludere individer med enten negativ inntekt etter skatt eller null i inntekt. Dette gjøres for å oppnå et mer pålitelig gjennomsnittsgrunnlag og redusere svingninger i totalgrunnlaget. Med disse dataene ønsker vi å utføre gjennomsnittsanalyser for innbyggerne i Tromsø kommune. Dette innebærer også å fjerne individer med lav eller ingen inntekt som likevel er skattepliktige på grunn av ulike skatter og som har høy formue.
+
+## **Oppgave 2.2:**
+
+```{r}
+
+#Oppgave 2.2 kode for beregning av nominelle gjennomsnittsverdier for Tromsø kommune fra 2016-2020.
+
+
+Tromsø_kommune_nominelle_gjennomsnittsverdier_2016_2020 <- Tromsø_innbygger_register %>%
+  group_by(År) %>% 
+  summarise(Kommune_gj.inntekt = mean(Inntekt),
+            Kommune_gj.skatt = mean(Skatt),
+            Kommune_gj.inntekt_etter_skatt = mean(Inntekt_etter_skatt),
+            Kommune_gj.formue = mean(Formue))
+
+
+Tromsø_kommune_nominelle_gjennomsnittsverdier_2016_2020 %>%  view()
+
+
+```
+
+```{r}
+
+#Oppgave 2.2 kode for beregning av reelle gjennomsnittsverdier for Tromsø kommune fra 2016-2020.
+
+#Finne Reelle verdier og det innebærer omgjøring til 2015 priser.
+Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020 <- Tromsø_innbygger_register %>%
+  inner_join(KPI, by = "År") %>% 
+  mutate_at(vars(Inntekt, Skatt, Inntekt_etter_skatt, Formue), ~ (. * 100) / KPI_verdi) %>% 
+  group_by(År) %>% 
+  summarise(Kommune_gj.inntekt = mean(Inntekt), 
+            Kommune_gj.skatt = mean(Skatt),
+            Kommune_gj.inntekt_etter_skatt = mean(Inntekt_etter_skatt),
+            Kommune_gj.formue = mean(Formue)) 
+
+
+Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020
+
+
+```
+
+### Løsning:
+
+Følgende data, Tromsø kommune nominelle gjennomsnittsverdier 2016-2020, viser de årlige gjennomsnittsverdiene i nominelle kroner for det angitte utvalget fra vår datasett.
+
+Tromsø kommune reelle gjennomsnittsverdier 2016-2020 viser årlige gjennomsnittsverdier i reelle kroner, angitt i 2015-kroner.
+
+## Oppgave 2.3 og oppgave 2.4:
+
+Svarene for begge oppgaver er oppgitt i samme oppgavetekst.
+
+```{r}
+
+# Oppagve 2.3 kode
+
+#Lage ny datasett med ny kolonne alder som har "KG" som verdi. "KG" står for kommunegjennomsnitt. 
+
+Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020_alder <- Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020 %>%  
+  rename(Gj.inntekt  = "Kommune_gj.inntekt", 
+         Gj.skatt =  "Kommune_gj.skatt", 
+         Gj.inntekt_etter_skatt = "Kommune_gj.inntekt_etter_skatt",
+         Gj.formue = "Kommune_gj.formue") %>% 
+  mutate(Aldersgruppe = "KG") %>% view() #Lager en ny kolonne med navn "KG" kommunegjennomsnitt. Følgende vil blir brukt for å sammenlignende data.
+  
+ 
+#Lage ny datasett med ny kolonne Postnmr som har "KG" som verdi. "KG" står for kommunegjennomsnitt. 
+
+Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020_pstnmr <- Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020 %>% 
+   rename(Gj.inntekt  = "Kommune_gj.inntekt", 
+         Gj.skatt =  "Kommune_gj.skatt", 
+         Gj.inntekt_etter_skatt = "Kommune_gj.inntekt_etter_skatt",
+         Gj.formue = "Kommune_gj.formue") %>% 
+  mutate(Postnmr = "KG") #Lager en ny kolonne med navn "KG" kommunegjennomsnitt. Følgende vil blir brukt for å sammenlignende data.
+
+
+
+```
+
+```{r}
+
+
+# oppgave 2.3 kode:
+
+#Lager en ny dataset som viser prosentvisendring i gjennomsnittsverdier for alle år og hvor mye de utgjør som andel av kommunegjennomsnittet.
+
+
+Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020_aldersdata <- Tromsø_innbygger_register %>%
+  inner_join(KPI, by = "År") %>% 
+  mutate_at(vars(Inntekt, Skatt, Inntekt_etter_skatt, Formue), ~ (. * 100) / KPI_verdi) %>% 
+  mutate(Aldersgruppe = case_when(          #omgjør alder til aldersgrupper.
+      Alder >= 18 & Alder <= 24 ~ "18-24",
+     Alder >= 25 & Alder <= 29 ~ "25-29",
+     Alder >= 30 & Alder <= 39 ~ "30-39",
+     Alder >= 40 & Alder <= 66 ~ "40-66",
+     Alder >= 67  ~ "67+")) %>% 
+  group_by(År,Aldersgruppe) %>%    #finner gjennomsnittsverdier for alle aldersgrupper. 
+  summarise(Gj.inntekt = mean(Inntekt),
+            Gj.skatt = mean(Skatt),
+            Gj.inntekt_etter_skatt = mean(Inntekt_etter_skatt),
+            Gj.formue = mean(Formue)) %>% 
+  bind_rows(Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020_alder) %>% #. 
+  group_by(Aldersgruppe) %>% 
+  mutate(           #Finner prosentvis endring fra et år til annet.                        
+    Pst.endr_gj.inntekt = round(((Gj.inntekt - lag(Gj.inntekt)) / lag(Gj.inntekt)) * 100,2),
+    Pst.endr_gj.skatt = round(((Gj.skatt - lag(Gj.skatt)) / lag(Gj.skatt)) * 100,2),
+    Pst.endr_gj.inntekt_etter_skatt = 
+      round(((Gj.inntekt_etter_skatt - lag(Gj.inntekt_etter_skatt)) / lag(Gj.inntekt_etter_skatt)) * 100,2),
+    Pst.endr_gj.formue = round(((Gj.formue - lag(Gj.formue)) / lag(Gj.formue)) * 100,2)) %>%  
+  inner_join(Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020, by = "År") %>% 
+  mutate( #Lager nye kolonner med andel av gjennomsnittet.
+    Pst_av_kommune.gj.inntekt = round((Gj.inntekt / Kommune_gj.inntekt) * 100,2),
+    Pst_av_kommune.gj.skatt = round((Gj.skatt / Kommune_gj.skatt) * 100,2),
+    Pst_av_kommune.gj.inntekt_etter_skatt = 
+      round((Gj.inntekt_etter_skatt / Kommune_gj.inntekt_etter_skatt) * 100,2),
+    Pst_av_kommune.gj.formue = round((Gj.formue / Kommune_gj.formue) * 100,2)) %>%  
+  arrange(Aldersgruppe) %>% 
+  select(År, 
+         Aldersgruppe, 
+         Gj.inntekt, 
+         Pst.endr_gj.inntekt, 
+         Pst_av_kommune.gj.inntekt,
+         Gj.skatt, 
+         Pst.endr_gj.skatt, 
+         Pst_av_kommune.gj.skatt, 
+         Gj.inntekt_etter_skatt, 
+         Pst.endr_gj.inntekt_etter_skatt,
+         Pst_av_kommune.gj.inntekt_etter_skatt,
+         Gj.formue,
+         Pst.endr_gj.formue,
+         Pst_av_kommune.gj.formue) %>%  view()
+  
+  
+
+
+  Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020_aldersdata
+  
+  
+  
+
+```
+
+### Løsning:
+
+Fra vårt datagrunnlag har jeg valgt å fordele aldersgruppene på følgende måte:
+
+-   18-24 år
+
+-   25-29 år
+
+-   30-39 år
+
+-   40-66 år
+
+-   67 år og eldre
+
+Denne inndelingen er basert på behovet for å analysere utviklingen innen ulike demografiske aldersgrupper. Alder spiller en betydelig rolle når det kommer til inntekt, formuesoppbygging, og generelt for å kategorisere mennesker i ulike livssituasjoner.
+
+### Oppgave A - Gjennomsnittsinntekt gitt aldersgrupper:
+
+```{r}
+
+# Gj.inntekt fordelt på ulike aldersgrupper og sammenlignet med kommunegjennomsnittet. 
+ #Reel vekst.
+
+Graf_Tromsø_kommune_gjennomsnittsinntekt <- Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020_aldersdata %>% 
+  mutate(År = as.character(År)) %>% 
+ggplot(mapping = aes(x = Aldersgruppe , y = Gj.inntekt,  fill = År)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Gjennomsnittsinntekt for ulike aldersgrupper", 
+    subtitle = "Fra 2016-2020",
+    x = "Aldersgrupper ",
+    y = "Gjennomsnittsinntekt") +
+  scale_fill_discrete(name = "År:") +
+  scale_y_continuous(labels = scales::number_format(accuracy = 1))
+
+```
+
+```{r}
+
+# Prosentvis endring i inntekt fordelt på ulike aldersgrupper og kommunegjennnomsnittet.  
+
+ Graf_Tromsø_kommune_gjennomsnittsinntekt_årlig_endring <- Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020_aldersdata %>% 
+  filter( År > 2016) %>% 
+  mutate(År = as.character(År)) %>% 
+  ggplot(mapping = aes( x = Aldersgruppe, y = Pst.endr_gj.inntekt,  
+                        fill = År)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Prosentvis endring i realinntekt ",
+    subtitle = "Fra 2016-2020",
+    x = "Aldersgrupper ",
+    y = "Prosentvis endring") +
+  scale_fill_discrete(name = "Årlig endring:", labels = c("2016-2017", "2017-2018", 
+                                                          "2018-2019", "2019-2020")) 
+ 
+
+
+```
+
+```{r}
+
+#Innteksforkjell mellom aldersgruppe og gjennomsnittet. Reel vekst. 
+
+ Graf_Tromsø_kommune_gjennomsnittsinntekt_sammenlignet_med_kommunegjennomsnitt <- 
+   Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020_aldersdata %>% 
+  mutate(År = as.character(År)) %>% 
+   filter(Pst_av_kommune.gj.inntekt != 100) %>% 
+  ggplot(mapping = aes( x = Aldersgruppe, y = Pst_av_kommune.gj.inntekt,  
+                        fill = År)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Inntekt som prosentsandel i forhold til gjennomsnittet i kommunen ",
+    subtitle = "2016-2020",
+    x = "Aldersgrupper ",
+    y = "Prosentandel av kommunegjennomsnittet") 
+
+
+```
+
+```{r}
+
+
+Graf_Tromsø_kommune_gjennomsnittsinntekt
+
+Graf_Tromsø_kommune_gjennomsnittsinntekt_årlig_endring
+
+Graf_Tromsø_kommune_gjennomsnittsinntekt_sammenlignet_med_kommunegjennomsnitt
+
+
+```
+
+### Løsning:
+
+Vi har utarbeidet tre grafer. Tallene som er benyttet i våre grafer er uttrykt i 2015-kroner for å justere for inflasjon og beregne om det har vært en reell økning eller nedgang i inntekt.
+
+Den første grafen illustrerer gjennomsnittsinntekten for hver av aldersgruppene.
+
+Den andre grafen illustrerer den gjennomsnittlige årlige prosentendringen i inntekt.
+
+Den tredje grafen illustrerer prosentandelen som aldersgruppene utgjør i forhold til kommunegjennomsnittet.
+
+### Aldersgruppen 18-24 åringer:
+
+I perioden fra 2016 til 2020 hadde individer i aldersgruppen 18-24 år den laveste gjennomsnittsinntekten, sammenlignet med andre aldersgrupper og kommunens gjennomsnittsinntekt. Det er viktig å merke seg at det var variasjoner i vekstraten i løpet av denne perioden:
+
+-   I årene 2016-2017 og 2018-2019 opplevde de en økning i realinntekten på henholdsvis 1.22% og 3.25%.
+
+-   I årene 2017-2018 og 2019-2020 opplevde de en nedgang i realinntekten med henholdsvis 0.69% og 0.85%.
+
+Samlet sett viser analysen at aldersgruppen hadde svingninger i vekstraten, men opplevde en helhetlig økning i realinntekt over perioden.
+
+Når vi sammenligner gjennomsnittsinntekten, inntektsøkning og vekstratene med kommunens gjennomsnitt, hadde aldersgruppen gjennomsnittlig lavere inntekt i hele perioden fra 2016 til 2020.
+
+-   I årene 2016-2018 og 2019-2020 hadde aldersgruppen lavere vekstrate.
+
+-   I årene 2018-2019 hadde aldersgruppen en høyere vekstrate.
+
+Som et resultat sank andelen av inntekten fra å utgjøre 31.68% av kommunens gjennomsnittsinntekt i 2016 til 31.34% i 2020. Dette indikerer at selv om aldersgruppen hadde en lavere andel av inntekten i begynnelsen av perioden, var veksten helhetlig lavere, noe som ytterligere reduserte andelen.
+
+### Aldersgruppen 25-29 åringer:
+
+I perioden fra 2016 til 2020 hadde individer i aldersgruppen 25-29 år en inntektsvekst på 5,44%, 1,55%, 3,58% og 1,39%. Samlet sett viser analysen at aldersgruppen 25-29 år har hatt økning i realinntekt.
+
+Hvis vi sammenligner gjennomsnittsinntekt, inntektsøkning og vekstratene med gjennomsnittet for kommunen, har aldersgruppen i gjennomsnitt hatt lavere inntekt i hele perioden fra 2016 til 2020. Imidlertid har aldersgruppen hatt høyere vekstrate hvert år.
+
+Som et resultat har inntektsandelen økt fra å utgjøre 66% av kommunegjennomsnittet i 2016 til 71,3% i 2020. Dette indikerer at selv om aldersgruppen hadde lavere inntektsandel i begynnelsen av perioden, var veksten høyere, noe som har økt inntektsandelen.
+
+### Aldersgruppen 30-39 åringer:
+
+I perioden fra 2016 til 2020 hadde individer i aldersgruppen 30-39 år helhetlig økning i realinntekt. Det er viktig å bemerke at det har vært svingninger i vekstraten i løpet av denne perioden:
+
+-   I årene 2016-2017 og 2018-2020 var det realvekst på 2,48%, 1,43% og 1,39%.
+
+-   I årene 2017-2018 var det derimot en realnedgang på 2,09%.
+
+Samlet sett viser analysen at aldersgruppen 30-39 år har hatt betydelige svingninger i vekstraten, men har likevel opplevd en økning i realinntekt.
+
+Hvis vi sammenligner gjennomsnittsinntekt, inntektsøkning og vekstratene med gjennomsnittet for kommunen, har aldersgruppen i gjennomsnitt høyere inntekt i årene 2016 og 2017, men lavere inntekt fra 2018 til 2020. Når vi ser på vekstratene, legger vi merke til følgende:
+
+-   I årene 2016-2017 og 2018-2019 har aldersgruppen lavere vekstrate.
+
+-   I årene 2017-2018 og 2019-2020 har aldersgruppen høyere vekstrate.
+
+Som et resultat øker inntektsandelen fra å utgjøre 98,6% av kommunegjennomsnittet i 2016 til 97,8% i 2020. Dette indikerer at selv om aldersgruppen hadde en lavere inntektsandel i begynnelsen av perioden, var veksten helhetlig lavere , noe som ytterligere reduserte inntektsandelen.
+
+### Aldersgruppen 40-66 åringer:
+
+I perioden fra 2016 til 2020 hadde individer i aldersgruppen 40-66 år helhetlig økning i realinntekt. Det er viktig å bemerke at det har vært svingninger i vekstraten i løpet av denne perioden:
+
+-   I årene 2016-2018 og 2019-2020 var det realvekst på 0,78%, 1,46% og 1,44%.
+
+-   I året 2018-2019 var det derimot en realnedgang på 0,24%.
+
+Samlet sett viser analysen at aldersgruppen har hatt svingninger i vekstraten, men har likevel opplevd en økning i realinntekt.
+
+Hvis vi sammenligner gjennomsnittsinntekt, inntektsøkning og vekstratene med gjennomsnittet for kommunen, har aldersgruppen i gjennomsnitt høyere inntekt i hele perioden fra 2016 til 2020. Imidlertid har også aldersgruppen hatt lavere inntektsvekst hvert år.
+
+Som et resultat minker inntektsandelen fra å utgjøre 128,5% av kommunegjennomsnittet i 2016 til 127,8% i 2020. Dette indikerer at selv om aldersgruppen hadde høyere inntektsandel i begynnelsen av perioden, var veksten helhetlig lavere , noe som reduserte inntektsandelen.
+
+### Aldersgruppen 67+:
+
+I perioden fra 2016 til 2020 hadde individer i aldersgruppen 67+ år helhetlig økning i realinntekt. Det er viktig å bemerke seg at det har vært svingninger i vekstraten i løpet av denne perioden:
+
+-   I året 2016-2017 var det en realnedgang på 1,47%.
+
+-   I årene 2017-2020 var det en realvekst på 0,23%, 1,23% og 0,67%.
+
+Samlet sett viser analysen at aldersgruppen 67+ år har hatt svingninger i vekstraten, men har likevel opplevd en økning i realinntekt.
+
+Hvis vi sammenligner gjennomsnittsinntekt, inntektsøkning og vekstratene med gjennomsnittet for kommunen, har aldersgruppen i gjennomsnitt lavere inntekt i hele perioden fra 2016 til 2020.
+
+-   I årene 2016-2018 og 2019-2020 har aldersgruppen høyere vekstrate.
+
+-   I året 2018-2019 har aldersgruppen lavere vekstrate.
+
+Som et resultat minker inntektsandelen fra å utgjøre 89,6% av kommunegjennomsnittet i 2016 til 86,4% i 2020. Dette indikerer at selv om aldersgruppen hadde lavere inntektsandel i begynnelsen av perioden, var veksten helhetlig lavere, noe som ytterligere reduserte inntektsandelen."
+
+### Oppgave B - Gjennomsnittsskatt gitt aldersgrupper:
+
+```{r}
+
+
+#Gj.skatt gitt aldersgrupper: 
+Graf_Tromsø_kommune_gjennomsnittsskatt <- Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020_aldersdata %>% 
+  mutate(År = as.character(År)) %>% 
+  ggplot(mapping = aes( x = Aldersgruppe, y = Gj.skatt,  fill = År)) +
+  geom_col(position = "dodge") +
+   labs(
+    title = " Gjennomsnittsskatt for ulike aldersgrupper", 
+    subtitle = "Fra 2016-2020",
+    x = "Aldersgrupper ",
+    y = "Gjennomsnittsskatt") +
+  scale_y_continuous(labels = scales::number_format(accuracy = 1))
+  
+
+
+```
+
+```{r}
+
+
+Graf_Tromsø_kommune_gjennomsnittsskatt_prosentvis_endring <- 
+  Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020_aldersdata %>% 
+  filter( År > 2016) %>% 
+  mutate(År = as.character(År)) %>% 
+  ggplot(mapping = aes( x = Aldersgruppe, y = Pst.endr_gj.skatt,  
+                        fill = År)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Prosentvis endring i gjennomsnittsskatt, for ulike aldersgrupper",
+    subtitle = "Fra 2016-2020",
+    x = "Aldersgrupper ",
+    y = "Prosentandel") +
+  scale_fill_discrete(name = "Årlig endring:", labels = c("2016-2017", "2017-2018", 
+                                                          "2018-2019", "2019-2020")) 
+
+  
+
+  
+```
+
+```{r}
+
+
+#Gjennomsnittsforhold i sammenlignet med kommunegjennomsnittet.
+
+Graf_Tromsø_kommune_gjennomsnittsinntekt_sammenlignet_med_kommunegjennomsnitt <-
+  Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020_aldersdata %>% 
+  mutate(År = as.character(År)) %>% 
+  filter( Pst_av_kommune.gj.skatt != 100) %>% 
+  ggplot(mapping = aes( x = Aldersgruppe, y = Pst_av_kommune.gj.skatt,  
+                        fill = År)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = 
+      "Skattbidrag som andel av gjennomsnittet i kommunen", 
+    subtitle = "Fra 2016-2020",
+    x = "Aldersgrupper ",
+    y = "skattebidrag som andel av kommunegjennomsnittet ") 
+  
+
+
+
+```
+
+```{r}
+
+
+Graf_Tromsø_kommune_gjennomsnittsskatt
+
+Graf_Tromsø_kommune_gjennomsnittsskatt_prosentvis_endring
+
+Graf_Tromsø_kommune_gjennomsnittsinntekt_sammenlignet_med_kommunegjennomsnitt
+
+
+```
+
+### Løsning:
+
+Vi har utarbeidet tre grafer. Tallene som er benyttet i våre grafer er uttrykt i 2015-kroner for å justere for inflasjon og beregne om det har vært en reell økning eller nedgang i skattebidrag.
+
+Den første grafen illustrerer gjennomsnittsskatten for hver av aldersgruppene.
+
+Den andre grafen illustrerer årlige prosentendringen i skattebidraget.
+
+Den tredje grafen illustrerer prosentandelen som aldersgruppene utgjør i forhold til kommunegjennomsnittet.
+
+### Aldersgruppen 18-24:
+
+I perioden fra 2016 til 2020 hadde individer i aldersgruppen 18-24 år helhetlig økning i skattebidraget. Det er viktig å merke seg at det har vært svingninger i vekstraten i løpet av denne perioden:
+
+-   I årene 2016-2018 forekom det en realnedgang, med nedgang på 0,05% i 2016-2017 og 0,75% i 2017-2018.
+
+-   I årene 2018-2020 forekom det derimot en realvekst, med 2,07% i 2018-2019 og 1,42% i 2019-2020.
+
+Samlet sett viser analysen at aldersgruppen 18-24 år betaler mer i skatt.
+
+Hvis vi sammenligner skattebidrag, skatteøkning og vekstratene med gjennomsnittet for kommunen, betaler aldersgruppen i gjennomsnitt mindre i skatt i hele perioden fra 2016-2020.
+
+Samtlige,
+
+-   I årene 2016-2018 har aldersgruppen en realnedgang i skattebidraget, i motsetning til kommunegjennomsnittet som har skattevekst.
+
+-   I året 2018-2019 har aldersgruppen høyere vekst.
+
+-   I året 2019-2020 har aldersgruppen lavere vekst.
+
+Som et resultat minker skattebidraget fra å utgjøre 26,19% av kommunegjennomsnittet i 2016 til 25,73% i 2020."
+
+### Aldersgruppen 25-29 åringer:
+
+I perioden fra 2016 til 2020 hadde individer i aldersgruppen 18-24 år helhetlig økning i realinntekt. Det er viktig å merke seg at det har vært svingninger i vekstraten:
+
+-   I årene 2016-2020 forekom det realvekst med vekst på 5,25%, 1,30%, 3,41% og 2,11%.
+
+Samlet sett viser analysen at aldersgruppen 18-24 år betaler mer i skatt.
+
+Hvis vi sammenligner skattebidrag, skatteøkning og vekstratene med gjennomsnittet for kommunen, betaler aldersgruppen i gjennomsnitt mindre i skatt i hele perioden.
+
+Samtlige,
+
+-   I årene 2016-2020 har aldersgruppen høyere vekst.
+
+Som et resultat øker skattebidraget fra å utgjøre 65,94% av kommunegjennomsnittet i 2016 til 71,26% i 2020."
+
+### Aldersgruppen 30-39 åringer:
+
+I perioden fra 2016 til 2020 hadde individer i aldersgruppen 30-39 år helhetlig økning i realinntekt. Det er viktig å merke seg at det har vært svingninger i vekstraten i løpet av denne perioden:
+
+I årene 2016-2017 og 2018-2020 forekom det en realvekst 2,17%, 1,53% og 1,73%.
+
+I året 2017-2018 forekom det derimot en realnedgang på 2,43%.
+
+Samlet sett viser analysen at aldersgruppen 30-39 år betaler mer i skatt.
+
+Hvis vi sammenligner skattebidrag, skatteøkning og vekstratene med gjennomsnittet for kommunen, betaler aldersgruppen i gjennomsnitt mindre i skatt i hele perioden.
+
+Samtlige,
+
+I årene 2016-2017 og 2018-2019 har aldersgruppen høyere vekst.
+
+I årene 2017-2018 og 2019-2020 har aldersgruppen lavere vekst.
+
+Som et resultat minker skattebidraget fra å utgjøre 34,74% av kommunegjennomsnittet i 2016 til 29,48% i 2020."
+
+### Aldersgruppen 40-66 åringer:
+
+I perioden fra 2016 til 2020 hadde individer i aldersgruppen 40-66 år helhetlig økning i realinntekt. Det er viktig å merke seg at det har vært svingninger i vekstraten i løpet av denne perioden:
+
+I årene 2016-2018 og 2019-2020 forekom det en realvekst på 1,04%, 1,21% og 2,23%.
+
+I året 2018-2019, derimot, var det en realnedgang på 0,03%.
+
+Samlet sett viser analysen at aldersgruppen 40-66 år betaler mer i skatt.
+
+Hvis vi sammenligner skattebidrag, skatteøkning og vekstratene med gjennomsnittet for kommunen, betaler aldersgruppen i gjennomsnitt mer i skatt i hele perioden. Samtidig har aldersgruppen lavere vekst i alle år unntatt i 2018-2019, hvor det var en realnedgang.
+
+Som et resultat øker skattebidraget fra å utgjøre 118,34% av kommunegjennomsnittet i 2016 til 119,59% i 2020."
+
+### Aldergruppen 67+ åringer:
+
+I perioden fra 2016 til 2020 hadde individer i aldersgruppen 67+ år helhetlig økning i realinntekt. Det er viktig å merke seg at det har vært svingninger i vekstraten i løpet av denne perioden:
+
+I året 2016-2017 forekom en realnedgang på 1,06%.
+
+I årene 2017-2020 forekom det derimot realvekst på 0,13%, 0,47% og 2,05%.
+
+Samlet sett viser analysen at aldersgruppen betaler mer i skatt.
+
+Hvis vi sammenligner skattebidrag, skatteøkning og vekstratene med gjennomsnittet for kommunen, betaler aldersgruppen i gjennomsnitt mer i skatt i hele perioden. Samtlige,
+
+I årene 2016-2017 var det nedgang i vekst, i motsetning til kommunegjennomsnittet.
+
+I årene 2017-2018 og 2019-2020 er vekstratene lavere for aldersgruppen.
+
+I året 2018-2019 er vekstratene høyere for aldersgruppen.
+
+Som et resultat minker skattebidraget fra å utgjøre 69,2% av kommunegjennomsnittet i 2016 til 67,2% i 2020."
+
+### Oppgave C - Gjennomsnittsinntekt etter skatt:
+
+```{r}
+
+#Gj.inntekt etter skatt gitt aldersgrupper: 
+
+Graf_Tromsø_kommune_gjennomsnittsinntekt_etter_skatt <- Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020_aldersdata %>% 
+  mutate(År = as.character(År)) %>% 
+  ggplot(mapping = aes( x = Aldersgruppe, y = Gj.inntekt_etter_skatt,  fill = År)) +
+  geom_col(position = "dodge") +
+   labs(
+    title = " Gjennomsnittsinntekt etter skatt for ulike aldersgrupper", 
+    subtitle = "Fra 2016-2020",
+    x = "Aldersgrupper ",
+    y = "Gjennomsnittsinntekt etter skatt") +
+   scale_y_continuous(labels = scales::number_format(accuracy = 1))
+  
+```
+
+```{r}
+
+Graf_Tromsø_kommune_gjennomsnittsinntekt_etter_skatt_prosentvis_endring <- 
+  Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020_aldersdata %>% 
+  filter( År > 2016) %>% 
+  mutate(År = as.character(År)) %>% 
+  ggplot(mapping = aes( x = Aldersgruppe, y = Pst.endr_gj.inntekt_etter_skatt,
+                        fill = År)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Prosentvis endring i gjennomsnittsinntekt etter skatt for ulike aldersgrupper",
+    subtitle = "Fra 2016-2020",
+    x = "Aldersgrupper ",
+    y = "Prosentvis endring i inntekt etter skatt") +
+  scale_fill_discrete(name = "Årlig endring:", labels = c("2016-2017", "2017-2018", 
+                                                          "2018-2019", "2019-2020")) 
+
+```
+
+```{r}
+
+#Gjennomsnittsforhold i sammenlignet med kommunegjennomsnittet.
+
+Graf_Tromsø_kommune_gjennomsnittsinntekt_etter_skatt_sammenlignet_med_kommunegjennomsnitt <-
+  Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020_aldersdata %>% 
+  mutate(År = as.character(År)) %>% 
+  filter( Pst_av_kommune.gj.skatt != 100) %>% 
+  ggplot(mapping = aes( x = Aldersgruppe, y = Pst_av_kommune.gj.inntekt_etter_skatt,  
+                        fill = År)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = 
+      "Inntekt etter skatt som prosentsandel av gjennomsnittet i kommunen", 
+    subtitle = "2016-2020",
+    x = "Aldersgrupper ",
+    y = "Prosent av kommunegjennomsnittet") 
+  
+
+
+
+```
+
+```{r}
+
+
+Graf_Tromsø_kommune_gjennomsnittsinntekt_etter_skatt
+
+Graf_Tromsø_kommune_gjennomsnittsinntekt_etter_skatt_prosentvis_endring
+
+Graf_Tromsø_kommune_gjennomsnittsinntekt_etter_skatt_sammenlignet_med_kommunegjennomsnitt
+
+
+
+
+```
+
+### Løsning:
+
+Vi har utarbeidet tre grafer. Tallene som er benyttet i våre grafer er uttrykt i 2015-kroner for å justere for inflasjon og beregne om det har vært en reell økning eller nedgang i Inntekt etter skatt.
+
+Den første grafen illustrerer gjennomsnittsinntekt etter skatt for hver av aldersgruppene.
+
+Den andre grafen illustrerer den årlige prosentendringen i inntekt etter skatt.
+
+Den tredje grafen illustrerer prosentandelen som aldersgruppene utgjør i forhold til kommunegjennomsnittet.
+
+### Aldersgruppen 18-24:
+
+I perioden fra 2016 til 2020 hadde individer i aldersgruppen 18-24 år en positiv realvekst. Det er viktig å merke seg at det var svingninger i vekstraten i løpet av denne perioden:
+
+-   I årene 2016-2017 og 2018-2019 opplevde de en realvekst på 1.72% og 3.71%.
+
+-   I årene 2017-2018 og 2019-2020 hadde de en realnedgang på 0.67% og 1.71%.
+
+Samlet sett viser analysen at aldersgruppen 18-24 år hadde en realvekst i inntekt etter skatt.
+
+Hvis vi sammenligner inntekt etter skatt, inntektsveksten og vekstratene med gjennomsnittet for kommunen, hadde aldersgruppen gjennomsnittlig lavere inntekt etter skatt i hele perioden.
+
+I årene 2016-2017 og 2018-2019 hadde aldersgruppen høyere vekst enn gjennomsnittet.
+
+I årene 2017-2018 og 2019-2020 opplevde aldersgruppen en realnedgang, i motsetning til kommunegjennomsnittet.
+
+Som et resultat avtar inntektandelen fra å utgjøre 34.52% av kommunegjennomsnittet i 2016 til 34.25% i 2020. Dette indikerer at selv om aldersgruppen hadde lavere inntektsandel i begynnelsen av perioden, var veksten helhetlig lavere.
+
+### Aldersgruppen 25-29:
+
+I perioden fra 2016 til 2020 hadde individer i aldersgruppen 25-29 åringer helhetlig realvekst. Det er viktig å merke seg at det har vært svingninger i vekstraten i løpet av denne perioden:
+
+-   I perioden 2016-2020 forekommet det helhetlig realveskt i intervallet mellom 1.03 - 5.23%.
+
+Samlet sett viser analysen at aldersgruppen har realvekst i inntekt etter skatt.
+
+Hvis vi sammenligner inntekt etter skatt, inntektsveksten og vekstratene med gjennomsnittet for kommunen har aldersgruppen gjennomsnittelig lavere inntekt etter skatt i hele perioden. Aldersgruppen har høyere vekst i alle år, med unntatt av i år 2019 -2020.
+
+Som et resultat øker inntektandelen fra å utgjøre 67.59% av kommunegjennomsnittet i 2016 til 72.98% i 2020. Dette indikerer at selv om aldersgruppen hadde lavere inntektsandel i begynnelsen av perioden, var veksten helhetlig høyere som økte andelen og reduserte inntektsforkjellen.
+
+### Aldersgruppen 30-39:
+
+I perioden fra 2016 til 2020 hadde individer i aldersgruppen 30-39 åringer helhetlig realvekst. Det er viktig å merke seg at det var svingninger i vekstraten i løpet av denne perioden.
+
+-   I årene 2016-2017 og 2018-2020 opplevde de henholdsvis realvekst på 2.64%, 1.38% og 1.20%
+
+-   I året 2017-2018 opplevde de en negativ realnedgang på 1.91%.
+
+Samlet sett viser analysen at aldersgruppen 30-39 år hadde realvekst i inntekt etter skatt.
+
+Hvis vi sammenligner inntekt etter skatt, inntektsveksten og vekstratene med gjennomsnittet for kommunen, hadde aldersgruppen gjennomsnittlig lavere inntekt etter skatt i hele perioden. Samtidig opplevde denne aldersgruppen høyere vekst i alle år unntatt i 2017-2018, hvor de forekom realnedgang.
+
+Som et resultat minket inntektandelen fra å utgjøre 96.98% av kommunegjennomsnittet i 2016 til 96.43% i 2020. Dette indikerer at selv om aldersgruppen hadde lavere inntektsandel i begynnelsen av perioden, var veksten lavere, og dette førte til en ytterligere reduksjon i andelen.
+
+### Aldersgruppen 40-66:
+
+I perioden fra 2016 til 2020 hadde individer i aldersgruppen 40-66 år en samlet positiv realvekst. Det er viktig å merke seg at det var svingninger i vekstraten i løpet av denne perioden.
+
+-   I årene 2016-2018 og 2019-2020 opplevde de en positiv realvekst på henholdsvis 0.78%, 1.46% og 1.44%
+
+-   I året 2018-2019 hadde de realnedgang på 0.36%.
+
+Samlet sett viser analysen at aldersgruppen hadde en økning i inntekt etter skatt.
+
+Hvis vi sammenligner inntekt etter skatt, inntektsveksten og vekstratene med gjennomsnittet for kommunen, hadde aldersgruppen gjennomsnittlig høyere inntekt etter skatt i hele perioden. Samtidig opplevde denne aldersgruppen lavere vekst i alle år unntatt i 2017-2018.
+
+Som et resultat minket inntektandelen fra å utgjøre 124.8% av kommunegjennomsnittet i 2016 til 123.7% i 2020. Dette indikerer at selv om aldersgruppen hadde en høyere inntektsandel i begynnelsen av perioden, var veksten lavere, noe som førte til en reduksjon i andelen.
+
+### Aldersgruppen 67+ :
+
+I perioden fra 2016 til 2020 hadde individer i aldersgruppen 67+, en samlet positiv realvekst. Det er viktig å merke seg at det var svingninger i vekstraten i løpet av denne perioden.
+
+-   I året 2016-2017 opplevde de en realnedgang med en nedgang på 1.62%.
+
+-   I årene fra 2017-2020 hadde de derimot en realvekst på henholdsvis 0.26%, 1.51% og 0.17%.
+
+Samlet sett viser analysen at aldersgruppen hadde en økning i inntekt etter skatt.
+
+Hvis vi sammenligner inntekt etter skatt, inntektsveksten og vekstratene med gjennomsnittet for kommunen, hadde aldersgruppen gjennomsnittlig lavere inntekt etter skatt i hele perioden. Samtlige,
+
+-   I årene 2016-2017 og 2018-2019 hadde aldersgruppen høyere vekst.
+
+-   I året 2017-2018 hadde aldersgruppen en realnedgang, i motsetning til kommunegjennomsnittet.
+
+-   I 2019-2020 hadde aldersgruppen lavere vekst.
+
+Som et resultat minket inntektandelen fra å utgjøre 99.8% av kommunegjennomsnittet i 2016 til 96.4% i 2020. Dette indikerer at selv om aldersgruppen hadde lavere inntektsandel i begynnelsen av perioden, var veksten lavere, noe som førte til en ytterligere reduksjon i andelen.
+
+### Oppgave 2.4D - Gjennomsnittsformue for ulike aldersgrupper:
+
+```{r}
+
+#Gj.Formuegitt aldersgrupper: 
+
+Graf_Tromsø_kommune_gjennomsnittsformue <- Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020_aldersdata %>% 
+  mutate(År = as.character(År)) %>% 
+  ggplot(mapping = aes( x = Aldersgruppe, y = Gj.formue,  fill = År)) +
+  geom_col(position = "dodge") +
+   labs(
+    title = " Gjennomsnittsformue for ulike aldersgrupper", 
+    subtitle = "Fra 2016-2020",
+    x = "Aldersgrupper ",
+    y = "Gjennomsnittsskatt") 
+
+```
+
+```{r}
+
+Graf_Tromsø_kommune_gjennomsnittsformue_prosentvis_endring <- 
+  Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020_aldersdata %>% 
+  filter( År > 2016) %>% 
+  mutate(År = as.character(År)) %>% 
+  ggplot(mapping = aes( x = Aldersgruppe, y = Pst.endr_gj.formue,
+                        fill = År)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Prosentvis endring i gjennomsnittsformue", 
+    subtitle = "Fra 2016-2020",
+    x = "Aldersgrupper ",
+    y = "Prosentvis endring") +
+  scale_fill_discrete(name = "Årlig endring:", labels = c("2016-2017", "2017-2018", 
+                                                          "2018-2019", "2019-2020")) 
+
+```
+
+```{r}
+
+#Gjennomsnittsforhold i sammenlignet med kommunegjennomsnittet.
+
+Graf_Tromsø_kommune_gjennomsnittsformue_sammenlignet_med_kommunegjennomsnitt <-
+  Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020_aldersdata %>% 
+  mutate(År = as.character(År)) %>% 
+  filter( Pst_av_kommune.gj.skatt != 100) %>% 
+  ggplot(mapping = aes( x = Aldersgruppe, y = Pst_av_kommune.gj.formue,  
+                        fill = År)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = 
+      "Formue som prosentsandel  av gjennomsnittet i kommunen", 
+    subtitle = "Fra 2016-2020",
+    x = "Aldersgrupper ",
+    y = "Gjennomsnittsformue gitt i prosent") 
+  
+
+```
+
+```{r}
+
+Graf_Tromsø_kommune_gjennomsnittsformue
+
+Graf_Tromsø_kommune_gjennomsnittsformue_prosentvis_endring
+
+Graf_Tromsø_kommune_gjennomsnittsformue_sammenlignet_med_kommunegjennomsnitt
+
+
+
+```
+
+### Løsning:
+
+Vi har utarbeidet tre grafer. Tallene som er benyttet i våre grafer er uttrykt i 2015-kroner for å justere for inflasjon og beregne om det har vært en reell økning eller nedgang i formue.
+
+Den første grafen illustrerer gjennomsnittsformue for hver av aldersgruppene.
+
+Den andre grafen illustrerer den årlige prosentendringen i formue.
+
+Den tredje grafen illustrerer prosentandelen som aldersgruppene utgjør av kommunegjennomsnittet.
+
+### Aldersgruppen 18-24:
+
+I perioden fra 2016 til 2020 hadde individer i aldersgruppen 18-24 år en samlet realvekst. Det er viktig å merke seg at det var svingninger i vekstraten i løpet av denne perioden:
+
+-   I årene 2016-2017 og 2018-2020 opplevde de en realvekst på henholdsvis 14.23%, 4.14% og 7.44%.
+
+-   I året 2017-2018 var det eneste året med realnedgang, som var på 2.12%.
+
+Samlet sett viser analysen at aldersgruppen 18-24 år hadde store svingninger i vekstraten, men opplevde samlet sett en økning i formueverdien.
+
+Hvis vi sammenligner formueverdi, formueøkning og vekstratene med gjennomsnittet for kommunen, hadde aldersgruppen gjennomsnittlig lavere formueverdi i hele perioden fra 2016-2020. Samtlige,
+
+-   I årene 2016-2017 og 2018-2020 hadde aldersgruppen høyere vekstrate.
+
+-   I året 2017-2018 opplevde både aldersgruppen og kommunegjennomsnittet en negativ realnedgang, men nedgangen var lavere hos aldersgruppen.
+
+Som et resultat økte formueverdien fra å utgjøre 12.80% av kommunegjennomsnittet i 2016 til 13.71% i 2020. Dette indikerer at selv om aldersgruppen hadde lavere formueverdi i begynnelsen av perioden, var veksten høyere, og førte til en økning i andelen.
+
+### Aldersgruppen 25-29 åringer:
+
+I perioden fra 2016 til 2020 hadde individer i aldersgruppen 25-29 år en realnedgang i formue. Det er viktig å merke seg at det var svingninger i vekstraten i løpet av denne perioden:
+
+-   I året 2016-2017 opplevde de en realvekst på 4.62%.
+
+-   I året 2017-2018 hadde de en realnedgang på 22.35%, og dette var det eneste året med nedgang.
+
+I årene 2018-2020 var preget av positiv utvikling med en realvekst på 4.35% og 9.32%. Sistnevnte år hadde også den høyeste positive realveksten.
+
+Samlet sett viser analysen at aldersgruppen 25-29 åringer, hadde store svingninger i vekstraten, men opplevde samlet sett en nedgang i formueverdi.
+
+Hvis vi sammenligner formueverdi, formueøkning og vekstratene med gjennomsnittet for kommunen, hadde aldersgruppen gjennomsnittlig lavere formueverdi i hele perioden fra 2016-2020. Samtlige,
+
+-   I årene 2016-2018 var vekstraten lavere for aldersgruppen.
+
+-   I årene 2018-2020 var vekstraten høyere for aldersgruppen.
+
+Som et resultat minket formueverdien fra å utgjøre 22.05% av kommunegjennomsnittet i 2016 til 17.48% i 2020. Dette indikerer at selv om aldersgruppen hadde høyere formueverdi i begynnelsen av perioden, var veksten lavere og dette førte til en reduksjon i andelen deres.
+
+### Aldersgruppe 30 - 39 åringer:
+
+I perioden fra 2016 til 2020 hadde individer i aldersgruppen 30-39 år en samlet realnedgang i formue. Det er viktig å merke seg at det var svingninger i vekstraten i løpet av denne perioden:
+
+-   I året 2016-2017 opplevde de realvekst på 13.79%, som var høyest i perioden.
+
+. I året 2017-2018 hadde de en negativ realnedgang på 22.65%, og dette var det eneste året med nedgang.
+
+-   I årene 2018-2020 var preget av positiv utvikling med en realvekst på 6.56% og 2.54%.
+
+Samlet sett viser analysen at aldersgruppen 30-39 år hadde store svingninger i vekstraten, men opplevde samlet sett en nedgang i formueverdien.
+
+Hvis vi sammenligner formueverdi, formueøkning og vekstratene med gjennomsnittet for kommunen, hadde aldersgruppen gjennomsnittlig lavere formueverdi i hele perioden fra 2016-2020. Samtlige,
+
+-   I årene 2016-2017 og 2018-2019 hadde aldersgruppen høyere vekstrate.
+
+-   I året 2017-2018 opplevde både aldersgruppen og kommunegjennomsnittet en realnedgang, men nedgangen var betydelig større hos aldersgruppen med en nedgang på 22.65% sammenlignet med 3.69% for kommunen.
+
+Som et resultat minket formueverdien fra å utgjøre 34.79% av kommunegjennomsnittet i 2016 til 28.59% i 2020. Dette indikerer at selv om aldersgruppen hadde høyere formueverdi i begynnelsen av perioden, var veksten lavere, og dette førte til en reduksjon i andelen.
+
+### Aldersgruppe 40 - 66 åringer:
+
+I perioden fra 2016 til 2020 hadde individer i aldersgruppen 40-66 år en samlet realvekst i formue. Det er viktig å merke seg at det var svingninger i vekstraten i løpet av denne perioden:
+
+-   I året 2016-2017 opplevde de en realvekst på 12.26%, som var høyest i perioden.
+
+-   I året 2017-2018 hadde de en realnedgang på 2.83%, og dette var det eneste året med nedgang.
+
+-   I årene 2018-2020 var preget av positiv utvikling med en realvekst på 2.40% og 5.35%.
+
+Samlet sett viser analysen at aldersgruppen 40-46 år hadde store svingninger i vekstraten, men opplevde samlet sett en økning i formueverdien.
+
+Hvis vi sammenligner formueverdi, formueøkning og vekstratene med gjennomsnittet for kommunen, hadde aldersgruppen gjennomsnittlig høyere formueverdi i hele perioden fra 2016-2020. Imidlertid varierte vekstraten i løpet av denne perioden:
+
+-   I året 2016-2017 hadde aldersgruppen en høyere vekstrate.
+
+-   I året 2017-2018 opplevde både aldersgruppen og kommunegjennomsnittet en realnedgang, men nedgangen var lavere hos aldersgruppen.
+
+-   I årene 2018-2020 var vekstraten lavere hos aldersgruppen.
+
+Som et resultat økte formueverdien fra å utgjøre 118.3% av kommunegjennomsnittet i 2016 til 119.2% i 2020. Dette indikerer at selv om aldersgruppen hadde høyere formueverdi i begynnelsen av perioden, var veksten høyere og førte økning i andelen.
+
+### Aldersgruppe 67+ :
+
+I perioden fra 2016 til 2020 hadde individer i aldersgruppen 67+, helhetlig realvekst i formue. Det er viktig å merke seg at det var svingninger i vekstraten i løpet av denne perioden:
+
+-   I året 2016-2017 opplevde de en positiv realvekst på 6.44%, som var høyest i perioden.
+
+-   I året 2017-2018 hadde de en negativ realnedgang på 1.38%, og dette var det eneste året med nedgang.
+
+-   I årene 2018-2020 var preget av positiv utvikling med en realvekst på 0.73% og 4.25%.
+
+Samlet sett viser analysen at aldersgruppen 67+ år hadde store svingninger i vekstraten, men opplevde samlet sett en økning i formueverdien.
+
+Hvis vi sammenligner formueverdi, formueøkning og vekstratene med gjennomsnittet i kommunen, hadde aldersgruppen gjennomsnittlig høyere formueverdi i hele perioden fra 2016-2020. Imidlertid varierte vekstraten i løpet av denne perioden:
+
+-   I årene 2016-2017 og 2018-2020 var vekstraten lavere hos aldersgruppen.
+
+-   I året 2017-2018 opplevde både aldersgruppen og kommunegjennomsnittet en realnedgang, men nedgangen var lavere hos aldersgruppen.
+
+Som et resultat minket formueverdien fra å utgjøre 246.4% av kommunegjennomsnittet i 2016 til 232.5% i 2020. Dette indikerer at selv om aldersgruppen hadde høyere formueverdi i begynnelsen av perioden, var veksten lavere, og førte til en reduksjon i andelen.
+
+### Oppgave D: Gjennomsnittsverdier for regionsfordeling
+
+```{r}
+
+#Løsning for regionsfordeling.
+
+
+#Lage en data som viser de ulike regione og prosentvis endring og utgjørelse av kommunegjennomsnittet.
+
+Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020_bostedregion <- Tromsø_innbygger_register %>% 
+inner_join(KPI, by = "År") %>% 
+  mutate_at(vars(Inntekt, Skatt, Inntekt_etter_skatt, Formue), ~ (. * 100) / KPI_verdi) %>%
+  filter(Postnmr %in% c(9007, 9008, 9009, 
+           9010, 9011, 9006, 
+           9012, 9013, 9016, 
+           9014, 9015, 9017,
+           9018, 9019, 9020, 9021, 9022, 9023, 9024,
+           9100, 9101, 9102)
+           ) %>% 
+    mutate(Postnmr =  case_when( #fordelt basert på regioner.
+    Postnmr %in% c(9007, 9008, 9009, 9010, 9011) ~ " STM",
+    Postnmr %in% c(9006, 9012, 9013, 9016) ~ " V",
+    Postnmr %in% c(9014, 9015, 9017,9018, 9019) ~ " N", 
+    Postnmr %in% c(9020, 9021, 9022, 9023, 9024) ~ "FL", 
+    Postnmr %in% c(9100, 9101, 9102) ~ "KA")) %>% 
+    group_by(Postnmr,År) %>% 
+  summarise(Gj.inntekt = mean(Inntekt),
+            Gj.skatt = mean(Skatt),
+            Gj.inntekt_etter_skatt = mean(Inntekt_etter_skatt),
+            Gj.formue = mean(Formue)) %>%  
+  rbind(Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020_pstnmr) %>% 
+  mutate( #lage nye kolonner med prosentvis endring av gjennomsnittsverdier.
+    Pst.endr_gj.inntekt = round(((Gj.inntekt - lag(Gj.inntekt)) / lag(Gj.inntekt)) * 100,2),
+    Pst.endr_gj.skatt = round(((Gj.skatt - lag(Gj.skatt)) / lag(Gj.skatt)) * 100,2),
+    Pst.endr_gj.inntekt_etter_skatt = 
+      round(((Gj.inntekt_etter_skatt - lag(Gj.inntekt_etter_skatt)) / lag(Gj.inntekt_etter_skatt)) * 100,2),
+    Pst.endr_gj.formue = round(((Gj.formue - lag(Gj.formue)) / lag(Gj.formue)) * 100,2)) %>%
+  inner_join(Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020, by = "År") %>%
+                        #lage nye kolonner med andel gjennomsnittsverdier
+  mutate(Pst_av_kommune.gj.inntekt = round((Gj.inntekt/Kommune_gj.inntekt)*100,2),
+         Pst_av_kommune.gj.skatt =round((Gj.skatt/Kommune_gj.skatt)*100,2),
+         Pst_av_kommune.gj.inntekt_etter_skatt = round(
+             (Gj.inntekt_etter_skatt/Kommune_gj.inntekt_etter_skatt)*100,2),
+         Pst_av_kommune.gj.formue = round((Gj.formue/Kommune_gj.formue)*100,2)) %>% 
+  rename(Region = Postnmr) %>% 
+  select(År, #Filtert data i riktig rekkefølge.
+         Region, 
+         Gj.inntekt,
+          Pst.endr_gj.inntekt, 
+         Pst_av_kommune.gj.inntekt,
+         Gj.skatt,
+          Pst.endr_gj.skatt, 
+         Pst_av_kommune.gj.skatt, 
+         Gj.inntekt_etter_skatt, 
+         Pst.endr_gj.inntekt_etter_skatt,
+         Pst_av_kommune.gj.inntekt_etter_skatt,
+         Pst.endr_gj.skatt, 
+         Pst_av_kommune.gj.skatt, 
+         Gj.inntekt_etter_skatt, 
+         Pst.endr_gj.inntekt_etter_skatt,
+         Pst_av_kommune.gj.inntekt_etter_skatt,
+         Gj.formue,
+         Pst.endr_gj.formue,
+         Pst_av_kommune.gj.formue) %>% view()
+         
+
+
+```
+
+### Løsning:
+
+I oppgaven har jeg valgt å fokusere på Tromsø by og har dermed fordelt postnummerne på 5 regioner:
+
+-   Region "STM" Sentrum omfatter sentrumsområdet og består av følgende postnummer: 9007, 9008, 9009, 9010 og 9011.
+
+-   Region "V" Vest omfatter de sørlige og vestlige delene av Tromsøya og består av følgende postnummer: 9006, 9012, 9013 og 9016.
+
+-   Region "N" Nord omfatter den nordlige delen av Tromsøya og består av følgende postnummer: 9014, 9015, 9017, 9018 og 9019.
+
+-   Region "FL" Fastlandet omfatter bydelene på fastlandet og består av følgende postnummer: 9020, 9021, 9022, 9023 og 9024.
+
+-   Region "KA" omfatter bydelene på Kvaløya og består av følgende postnummer: 9100, 9101, 9102.
+
+Ved å kun fokusere på Tromsø kommunes største by og mest befolkede tettsteder kan jeg få et klarere bilde av de sosioøkonomiske faktorene som skaper og splitter regionene. Jeg har derfor valgt å hovedsakelig fokusere på Tromsø by.
+
+### Oppgave E: Gjennomsnittsinntekt for ulike regioner i Tromsø by:
+
+```{r}
+
+Graf_Tromsø_kommune_gjennomsnittsinntekt_bostedregion <- 
+  Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020_bostedregion %>% 
+  mutate(År = as.character(År)) %>% 
+  ggplot(mapping = aes(x = Region, y = Gj.inntekt,  fill = År)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Gjennomsnittsinntekt for ulike regioner i Tromsø by ",
+    subtitle = "Fra perioden 2016-2020",
+    x = "Region ",
+    y = "Gjennomsnittsinntekt") +
+  scale_y_continuous(labels = scales::number_format(accuracy = 1))
+
+
+
+```
+
+```{r}
+
+Graf_Tromsø_kommune_gjennomsnittsinntekt_prosentvis_endring_bostedsregion <- 
+  Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020_bostedregion %>%  
+  filter( År > 2016) %>% 
+  mutate(År = as.character(År)) %>% 
+  ggplot(mapping = aes( x = Region, y = Pst.endr_gj.inntekt,  
+                        fill = År)) +
+  geom_col(position = "dodge") +
+   labs(
+    title = "Prosentvis endring i inntekt ",
+    subtitle = "Fra perioden 2016-2020",
+    x = "År ",
+    y = "Prosentandel") +
+    scale_fill_discrete(name = "Årlig endring:", labels = c("2016-2017", "2017-2018", 
+                                                          "2018-2019", "2019-2020")) 
+
+
+```
+
+```{r}
+
+ Graf_Tromsø_kommune_gjennomsnittsinntekt_sammenligning_bostedsregion <-
+   Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020_bostedregion %>% 
+  mutate(År = as.character(År)) %>% 
+   filter( Pst_av_kommune.gj.inntekt != 100) %>%
+  ggplot(mapping = aes( x = Region, y = Pst_av_kommune.gj.inntekt,  
+                        fill = År)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Inntekt som posentsandel  av gjennomsnittet i kommunen ",
+    subtitle = "Fra perioden 2016-2020",
+    x = "År ",
+    y = "Prosentandel av kommunegjennomsnittet") 
+
+
+
+```
+
+```{r}
+
+Graf_Tromsø_kommune_gjennomsnittsinntekt_bostedregion
+Graf_Tromsø_kommune_gjennomsnittsinntekt_prosentvis_endring_bostedsregion
+Graf_Tromsø_kommune_gjennomsnittsinntekt_sammenligning_bostedsregion
+
+
+
+```
+
+### **Løsning:**
+
+Vi har utarbeidet tre grafer. Tallene som er benyttet i våre grafer er uttrykt i 2015-kroner for å justere for inflasjon og beregne om det har vært en reell økning eller nedgang i inntekt.
+
+Den første grafen illustrerer den gjennomsnittlige inntekten for hver av regionene.
+
+Den andre grafen illustrerer den gjennomsnittlige årlige prosentendringen i inntekt.
+
+Den tredje grafen illustrerer prosentandelen som regionene utgjør i forhold til kommunegjennomsnittet.
+
+### Region Nord:
+
+I perioden fra 2016 til 2020 hadde Region Nord gjennomsnittlig lavere inntekt per person sammenlignet med gjennomsnittet i kommunen. Imidlertid varierte vekstraten i løpet av denne perioden:
+
+-   I årene 2016-2017 var vekstraten lavere i regionen.
+
+-   I de øvrige årene fra 2017-2020 var veksten høyere i regionen.
+
+Som et resultat økte inntektsandelen fra å utgjøre 97,83% av kommunegjennomsnittet i 2016 til 98,07% i 2020. Dette indikerer at selv om regionen hadde lavere inntekt per person sammenlignet med kommunegjennomsnittet i begynnelsen av perioden, var veksten helhetlig høyere og reduserte inntektsforskjellen.
+
+### Region Sentrum:
+
+I perioden fra 2016 til 2020 hadde Region Sentrum gjennomsnittlig lavere inntekt per person sammenlignet med gjennomsnittet i kommunen. Imidlertid varierte vekstraten i løpet av denne perioden:
+
+-   I årene 2016-2017 og 2018-2019 var vekstraten høyere i regionen.
+
+-   I årene 2017-2018 og 2019-2020 var vekstraten lavere i regionen.
+
+Som et resultat økte inntektsandelen fra å utgjøre 97,06% av kommunegjennomsnittet i 2016 til 97,42% i 2020. Dette indikerer at selv om regionen hadde lavere inntekt per person sammenlignet med kommunegjennomsnittet i begynnelsen av perioden, var veksten helhetlig høyere og reduserte inntektsforskjellen.
+
+### **Region Vest:**
+
+I perioden fra 2016 til 2020 hadde Region Vest gjennomsnittlig høyere inntekt per person sammenlignet med kommunegjennomsnittet. Imidlertid varierte vekstraten i løpet av denne perioden.
+
+-   I årene 2016-2017 og 2018-2019 opplevde regionen en realnedang, i motsetning til kommunegjennomsnittet.
+
+-   I årene 2017-2018 og 2019-2020 hadde regionen en høyere vekstrate sammenlignet med kommunen.
+
+Som et resultat minket andelen av inntekt fra å utgjøre 120.50% av kommunegjennomsnittet i 2016 til 116.23% i 2020. Dette indikerer at selv om regionen hadde høyere inntekt per person sammenlignet med kommunen i begynnelsen av perioden, var veksten totalt lavere og reduserte dermed inntektsforskjellen.
+
+### **Region Fastlandet:**
+
+I perioden fra 2016 til 2020 hadde Region Fastlandet gjennomsnittlig lavere inntekt per person sammenlignet med kommunegjennomsnittet. Imidlertid varierte vekstraten i løpet av denne perioden:
+
+-   I årene 2016-2017 og 2019-2020 hadde regionen en lavere vekstrate.
+
+-   I årene 2017-2019 hadde regionen en høyere vekstrate.
+
+Som et resultat økte andelen av inntekt fra å utgjøre 95.90% av kommunegjennomsnittet i 2016 til 96.08% i 2020. Dette indikerer at selv om regionen hadde lavere inntekt per person sammenlignet med kommunen i begynnelsen av perioden, var veksten totalt sett høyere og reduserte inntektsforskjellen.
+
+### **Region Kvaløya:**
+
+I perioden fra 2016 til 2020 hadde Region Kvaløya gjennomsnittlig høyere inntekt per person sammenlignet med kommunegjennomsnittet. Imidlertid varierte vekstraten i løpet av denne perioden:
+
+-   I årene 2016-2018 og 2019-2020 opplevde regionen en realnedgang i inntekten, i motsetning til kommunegjennomsnittet.
+
+-   I årene 2018-2019 hadde regionen høyere vekstrate.
+
+Som et resultat minket andelen av inntekt fra å utgjøre 112.46% av kommunegjennomsnittet i 2016 til 102.91% i 2020. Dette indikerer at selv om regionen hadde høyere inntekt per person sammenlignet med kommunegjennomsnittet i begynnelsen av perioden, var veksten totalt sett lavere og reduserte inntektsforskjellen.
+
+### Regionsammenligning:
+
+I perioden fra 2016 til 2020 var inntektsnivået i regionene Nord, Sentrum og Fastlandet på et sammenlignbart nivå, som utgjorde mellom 96-98% av kommunegjennomsnittet.
+
+Region Kvaløya opplever en prosentvis reduksjon fra fra å tjene 112,46% av kommunegjennomsnittet i 2016 til 102,91% i 2020. Dette har redusert inntektsforskjellene mellom Kvaløya og de nevnte regionene.
+
+Beboerne i Region Vest har den høyeste inntekten og opplevde også en prosentvis inntektsreduksjon fra å utgjøre 120,5% av kommunegjennomsnittet i 2016 til 116,23% i 2020."
+
+## Oppgave F: Gjennomsnittsskatt for regioner
+
+```{r}
+
+Graf_Tromsø_kommune_gjennomsnittsinntekt_bostedregion <- 
+  Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020_bostedregion %>% 
+  mutate(År = as.character(År)) %>% 
+  ggplot(mapping = aes(x = Region, y = Gj.inntekt,  fill = År)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Gjennomsnittsbeskatning for ulike regioner i Tromsø by ",
+    subtitle = "Fra perioden 2016-2020",
+    x = "Region ",
+    y = "Gjennomsnittsbeskatning") +
+  scale_y_continuous(labels = scales::number_format(accuracy = 1))
+
+
+
+```
+
+```{r}
+
+Graf_Tromsø_kommune_gjennomsnittsskatt_prosentvis_endring_bostedsregion <- 
+  Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020_bostedregion %>%  
+  filter( År > 2016) %>% 
+  mutate(År = as.character(År)) %>% 
+  ggplot(mapping = aes( x = Region, y = Pst.endr_gj.skatt,  
+                        fill = År)) +
+  geom_col(position = "dodge") + 
+   labs(
+    title = "Prosentvis endring i beskatning ",
+    subtitle = "Fra perioden 2016-2020",
+    x = "År ",
+    y = "Prosentandel") +
+    scale_fill_discrete(name = "Årlig endring:", labels = c("2016-2017", "2017-2018", 
+                                                          "2018-2019", "2019-2020")) 
+
+```
+
+```{r}
+
+ Graf_Tromsø_kommune_gjennomsnittsinntekt_sammenligning_bostedsregion <-
+   Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020_bostedregion %>% 
+  mutate(År = as.character(År)) %>% 
+   filter( Pst_av_kommune.gj.inntekt != 100) %>%
+  ggplot(mapping = aes( x = Region, y = Pst_av_kommune.gj.skatt,  
+                        fill = År)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Beskatning som prosentsandel av gjennomsnittet i kommunen ",
+    subtitle = "Fra perioden 2016-2020",
+    x = "År ",
+    y = "Prosentandel") 
+
+
+
+```
+
+```{r}
+
+Graf_Tromsø_kommune_gjennomsnittsinntekt_bostedregion
+Graf_Tromsø_kommune_gjennomsnittsskatt_prosentvis_endring_bostedsregion
+Graf_Tromsø_kommune_gjennomsnittsinntekt_sammenligning_bostedsregion
+
+```
+
+### **Løsning:**
+
+Vi har utarbeidet tre grafer. Tallene som er benyttet i våre grafer er uttrykt i 2015-kroner for å justere for inflasjon og beregne om det har vært en reell økning eller nedgang i skattebetaling.
+
+Den første grafen illustrerer gjennomsnittlige beskatning for hver av regionene.
+
+Den andre grafen illustrerer den gjennomsnittlige prosentendringen i beskatning.
+
+Den tredje grafen illustrerer prosentandelen som regionene utgjør i forhold til kommunegjennomsnittet.
+
+### **Region Nord:**
+
+I perioden fra 2016 til 2020 betalte region Nord gjennomsnittlig mindre skatt per person sammenlignet med gjennomsnittet i kommunen. Imidlertid varierte vekstraten i løpet av denne perioden.
+
+-   I året 2016-2017 var vekstraten lavere i regionen.
+
+-   I årene 2017-2020 var vekstraten høyere i regionen.
+
+Som et resultat minsket andelen av beskatning fra å utgjøre 97.83% av kommunegjennomsnittet i 2016 til 97.64% i 2020. Dette indikerer at selv om regionen hadde lavere beskatning per person sammenlignet med kommunegjennomsnittet i begynnelsen av perioden, var veksten totalt sett lavere, noe som reduserte beskatningsandelen ytterligere.
+
+### **Region Sentrum:**
+
+I perioden fra 2016 til 2020 betalte region Sentrum gjennomsnittlig mindre skatt per person sammenlignet med gjennomsnittet i kommunen. Imidlertid varierte vekstraten i løpet av denne perioden, og regionen hadde høyere vekst hvert år.
+
+Som et resultat økte andelen av beskatning fra å utgjøre 97.06% av kommunegjennomsnittet i 2016 til 97.42% i 2020. Dette indikerer at selv om regionen hadde lavere beskatning per person sammenlignet med kommunegjennomsnittet i begynnelsen av perioden, var veksten totalt sett høyere, noe som økte beskatningsandelen.
+
+### **Region Vest:**
+
+I perioden fra 2016 til 2020 betalte region Vest gjennomsnittlig mer skatt per person sammenlignet med gjennomsnittet i kommunen. Imidlertid varierte vekstraten i løpet av denne perioden.
+
+-   I året 2016-2017 var vekstraten lavere i regionen.
+
+-   I årene 2017-2018 og 2019-2020 opplevde regionen en nedgang i motsetning til kommunegjennomsnittet.
+
+-   I 2018-2019 var vekstraten høyere i regionen.
+
+Som et resultat minsket andelen av beskatning fra å utgjøre 118.21% av kommunegjennomsnittet i 2016 til 115.05% i 2020. Dette indikerer at selv om regionen hadde høyere beskatning per person sammenlignet med kommunegjennomsnittet i begynnelsen av perioden, var veksten totalt sett lavere, noe som reduserte beskatningsandelen.
+
+### **Region Fastlandet:**
+
+I perioden fra 2016 til 2020 betalte region Fastlandet gjennomsnittlig mindre skatt per person sammenlignet med gjennomsnittet i kommunen. Imidlertid varierte vekstraten i løpet av denne perioden.
+
+-   I årene 2016-2017 og 2019-2020 var vekstraten høyere i regionen.
+
+-   I årene 2017-2019 var vekstraten lavere i regionen.
+
+Som et resultat minsket beskatningsandelen fra å utgjøre 94.46% av kommunegjennomsnittet i 2016 til 94.39% i 2020. Dette indikerer at selv om regionen hadde lavere beskatningsandel per person sammenlignet med kommunegjennomsnittet i begynnelsen av perioden, var veksten totalt sett lavere, noe som reduserte beskatningsandelen.
+
+### **Region Kvaløya:**
+
+I perioden fra 2016 til 2020 betalte region Kvaløya gjennomsnittlig mer skatt per person sammenlignet med gjennomsnittet i kommunen. Imidlertid varierte vekstraten i løpet av denne perioden.
+
+-   I årene 2016-2019 opplevde regionen en nedgang i motsetning til kommunegjennomsnittet.
+
+-   I året 2019-2020 var vekstraten lavere i regionen.
+
+Som et resultat minsket beskatningsandelen fra å utgjøre 113.36% av kommunegjennomsnittet i 2016 til 102.68% i 2020. Dette indikerer at selv om regionen hadde høyere beskatningsandel per person sammenlignet med kommunegjennomsnittet i begynnelsen av perioden, var veksten totalt sett lavere, noe som reduserte beskatningsandelen.
+
+### Regionsammenligning
+
+I perioden fra 2016 til 2020 var skattenivået i regionene Nord, Sentrum, og Fastlandet på et sammenlignbart nivå, som utgjorde mellom 93-98% av kommunegjennomsnittet.Imidlertid opplevde Kvaløya en reduksjon i skattenivået, fra å innbetale 113.36% av kommunegjennomsnittet i 2016 til 102.68% i 2020. Dette resultatet reduserte skattedifferansen mellom regionene.
+
+Beboerne i Region Vest er fortsatt gruppen som betaler mest skatt. Det var imidlertid en reduksjon i skattebidraget fra å betale 118.21% av kommunegjennomsnittet i 2016 til 115.05% i 2020.
+
+### LOppgave G: Gjennomsnittsinntekt etter skatt for regioner
+
+```{r}
+
+Graf_Tromsø_kommune_gjennomsnittsinntekt_etter_skatt_bostedregion <- 
+  Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020_bostedregion %>% 
+  mutate(År = as.character(År)) %>% 
+  ggplot(mapping = aes(x = Region, y = Gj.inntekt_etter_skatt,  fill = År)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = " Gjennomsnittsinntekt for ulike regioner i Tromsø by ",
+    subtitle = "Fra perioden 2016-2020",
+    x = "Region ",
+    y = "Gjennomsnittsinntekt etter skatt") +
+  scale_y_continuous(labels = scales::number_format(accuracy = 1))
+
+
+```
+
+```{r}
+
+Graf_Tromsø_kommune_gjennomsnittsinntekt_etter_skatt_prosentvis_endring_bostedsregion <- 
+  Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020_bostedregion %>%  
+  filter( År > 2016) %>% 
+  mutate(År = as.character(År)) %>% 
+  ggplot(mapping = aes( x = Region, y = Pst.endr_gj.inntekt_etter_skatt,  
+                        fill = År)) +
+  geom_col(position = "dodge") +
+   labs(
+    title = "Prosentvis endring i inntekt etter skatt ",
+    subtitle = "Fra perioden 2016-2020",
+    x = "År ",
+    y = "Prosentandel") +
+    scale_fill_discrete(name = "Årlig endring:", labels = c("2016-2017", "2017-2018", 
+                                                          "2018-2019", "2019-2020")) 
+
+```
+
+```{r}
+
+ Graf_Tromsø_kommune_gjennomsnittsinntekt_etter_skatt_sammenligning_bostedsregion <-
+   Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020_bostedregion %>% 
+  mutate(År = as.character(År)) %>% 
+   filter( Pst_av_kommune.gj.inntekt != 100) %>%
+  ggplot(mapping = aes( x = Region, y = Pst_av_kommune.gj.inntekt_etter_skatt,  
+                        fill = År)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Inntekt etter skatt som prosentsandel i 
+    forhold til gjennomsnittet i kommunen ",
+    subtitle = "Fra perioden 2016-2020",
+    x = "År ",
+    y = "Prosentandel") 
+ 
+ 
+ 
+```
+
+```{r}
+
+
+Graf_Tromsø_kommune_gjennomsnittsinntekt_etter_skatt_bostedregion
+Graf_Tromsø_kommune_gjennomsnittsinntekt_etter_skatt_prosentvis_endring_bostedsregion
+Graf_Tromsø_kommune_gjennomsnittsinntekt_etter_skatt_sammenligning_bostedsregion
+
+
+```
+
+Vi har utarbeidet tre grafer. Tallene som er benyttet i våre grafer er uttrykt i 2015-kroner for å justere for inflasjon og beregne om det har vært en reell økning eller nedgang i inntekt etter skatt.
+
+Den første grafen illustrerer gjennomsnittlige inntekt etter skatt for hver av regionene.
+
+Den andre grafen illustrerer den gjennomsnittlige årlige prosentendringen i inntekt etter skatt.
+
+Den tredje grafen illustrerer prosentandelen som regionene utgjør som andel av kommunegjennomsnittet.
+
+### **Region Nord:**
+
+I perioden fra 2016 til 2020 hadde Region Nord gjennomsnittlig lavere inntekt etter skatt per person sammenlignet med gjennomsnittet i kommunen. Imidlertid varierte vekstraten i løpet av denne perioden.
+
+-   I året 2016-2017 var vekstraten lavere i regionen.
+
+-   I de øvrige årene fra 2017-2020 var veksten høyere i regionen.
+
+Som et resultat økte inntektsandelen fra å utgjøre 98.02% av kommunegjennomsnittet i 2016 til 98.17% i 2020. Dette indikerer at selv om regionen hadde lavere inntekt etter skatt per person sammenlignet med kommunegjennomsnittet i begynnelsen av perioden, var veksten totalt sett høyere.
+
+### **Region Sentrum:**
+
+I perioden fra 2016 til 2020 hadde Region Sentrum gjennomsnittlig lavere inntekt etter skatt per person sammenlignet med gjennomsnittet i kommunen. Imidlertid varierte vekstraten i løpet av denne perioden.
+
+-   I årene 2016-2017 og 2018-2019 var vekstraten høyere i regionen.
+
+-   I årene 2017-2018 og 2019-2020 var vekstraten lavere i regionen.
+
+Som et resultat økte nettoinntektsandelen fra å utgjøre 94.66% av kommunegjennomsnittet i 2016 til 97.19% i 2020. Dette indikerer at selv om regionen hadde lavere inntekt etter skatt per person sammenlignet med kommunegjennomsnittet i begynnelsen av perioden, var veksten totalt sett høyere.
+
+### **Region Vest:**
+
+I perioden fra 2016 til 2020 hadde Region Vest gjennomsnittelig høyere inntekt etter skatt per person sammenlignet med gjennomsnittsittet i kommunen. Imidlertidig varierte vesktraten i løpet av denne perioden:
+
+-   I årene 2016-2017 og 2018-2019 opplever regionen realnedgang i motsetning til kommunegjennomsnittet.
+
+-   I årene 2017- 2018 og 2019-2020 vekstraten høyere i regionen
+
+Som et resultat var det en nedgang i inntektsandelen fra å utgjøre 118.59% av kommunegjennomsnittet i 2016 til 114.20% i 2020. Dette indikerer at selv om regionen hadde høyere inntekt etter skatt per person sammenlignet med kommunegjennomsnittet i begynnelsen av perioden, var veksten helhetlig lavere og har dermed redusert andelen.
+
+### **Region Fastlandet:**
+
+I perioden fra 2016 til 2020 hadde Region Fastlandet gjennomsnittlig lavere inntekt etter skatt per person sammenlignet med gjennomsnittet i kommunen. Imidlertid varierte vekstraten i løpet av denne perioden.
+
+-   I årene fra 2016-2017 og 2019-2020 var vekstraten lavere.
+
+-   I årene fra 2017-2019 var vekstraten høyere i regionen.
+
+Som et resultat økte nettoinntektsandelen fra å utgjøre 96.65% av kommunegjennomsnittet i 2016 til 96.95% i 2020. Dette indikerer at selv om regionen hadde lavere inntekt etter skatt per person sammenlignet med kommunegjennomsnittet i begynnelsen av perioden, var veksten totalt sett høyere.
+
+### **Region Kvaløya:**
+
+I perioden fra 2016 til 2020 hadde Region Kvaløya gjennomsnittlig høyere inntekt etter skatt per person sammenlignet med gjennomsnittet i kommunen. Imidlertid varierte vekstraten i løpet av denne perioden.
+
+-   I årene fra 2016-2018 og 2019-2020 opplevde regionen en nedgang i motsetning til kommunegjennomsnittet.
+
+-   I året 2018-2019 var vekstraten høyere i regionen.
+
+Som et resultat var det en nedgang i inntektsandelen, som gikk fra å utgjøre 111.99% av kommunegjennomsnittet i 2016 til 103.03% i 2020. Dette indikerer at selv om regionen hadde høyere inntekt etter skatt per person sammenlignet med kommunegjennomsnittet i begynnelsen av perioden, var veksten totalt sett lavere, noe som reduserte inntektsandelen.
+
+### Regionsammenligning:
+
+I perioden fra 2016 til 2020 var inntekten etter skatt i regionene Nord, Sentrum, og Fastlandet på et sammenlignbart nivå, som utgjorde mellom 94% og 98% av kommunegjennomsnittet. Imidlertid opplevde Kvaløya en reduksjon fra å innhave en inntektsandelen på 111.99% av kommunegjennomsnittet i 2016 til 103.03% i 2020. Det medførte til at redusert innektsgap.
+
+Beboerne i Region Vest er den gruppen med høyest inntekt sammenlignet med de andre regionene. Det var imidlertid en reduksjon i deres inntektsandel, som gikk fra å utgjøre 118.59% av kommunegjennomsnittet i 2016 til 114.20% i 2020. Fortsatt betydlig høyere.
+
+## Oppgave H: Gjennomsnittsformue for regioner
+
+```{r}
+
+
+Graf_Tromsø_kommune_gjennomsnittsformue_bostedregion <- 
+  Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020_bostedregion %>% 
+  mutate(År = as.character(År)) %>% 
+  ggplot(mapping = aes(x = Region, y = Gj.formue,  fill = År)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Gjennomsnittsformue for ulike regioner i Tromsø by ",
+    subtitle = "Fra perioden 2016-2020",
+    x = "Region ",
+    y = "Gjennomsnittsformue") 
+
+```
+
+```{r}
+
+Graf_Tromsø_kommune_gjennomsnittsformue_prosentvis_endring_bostedsregion <- 
+  Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020_bostedregion %>%  
+  filter( År > 2016) %>% 
+  mutate(År = as.character(År)) %>% 
+  ggplot(mapping = aes( x = Region, y = Pst.endr_gj.formue,  
+                        fill = År)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Prosentvis endring i formueverdi ",
+    subtitle = "Fra perioden 2016-2020",
+    x = "År ",
+    y = "Prosentandel") +
+    scale_fill_discrete(name = "Årlig endring:", labels = c("2016-2017", "2017-2018", 
+                                                          "2018-2019", "2019-2020")) 
+
+```
+
+```{r}
+
+Graf_Tromsø_kommune_gjennomsnittsformue_sammenligning_bostedsregion <-
+   Tromsø_kommune_reell_gjennomsnittsverdier_2016_2020_bostedregion %>% 
+  mutate(År = as.character(År)) %>% 
+   filter( Pst_av_kommune.gj.inntekt != 100) %>%
+  ggplot(mapping = aes( x = Region, y = Pst_av_kommune.gj.formue,  
+                        fill = År)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Prosentsandel i forhold til gjennomsnittet i kommunen ",
+    subtitle = "Fra perioden 2016-2020",
+    x = "År ",
+    y = "Prosentandel") 
+
+
+```
+
+```{r}
+
+Graf_Tromsø_kommune_gjennomsnittsformue_bostedregion
+Graf_Tromsø_kommune_gjennomsnittsformue_prosentvis_endring_bostedsregion
+Graf_Tromsø_kommune_gjennomsnittsformue_sammenligning_bostedsregion
+
+```
+
+### Løsning:
+
+Vi har utarbeidet tre grafer. Tallene som er benyttet i våre grafer er uttrykt i 2015-kroner og er justere for inflasjon.
+
+Den første grafen illustrerer den gjennomsnittlige formueverdien for hver av regionene.
+
+Den andre grafen illustrerer den gjennomsnittlige prosentendringen i formueverdien.
+
+Den tredje grafen illustrerer prosentandelen som regionene utgjør i forhold til kommunegjennomsnittet.
+
+### **Region Nord:**
+
+I perioden fra 2016 til 2020 hadde regionen Nord en lavere formue per person sammenlignet med gjennomsnittet i kommunen. Imidlertidig varierte vesktraten i løpet av denne perioden:
+
+-   I årene 2016-2017 var vekstraten lavere i region Nord.
+
+-   I påfølgende år, 2017-2018, opplevde både region Nord og kommunegjennomsnittet en nedgang i formueverdi. Nedgangen var lavere i regionen.
+
+De to siste årene i perioden, 2019-2020, opplevde regionen Nord høyere formuevekst. Som et resultat økte formueandelen i regionen fra å utgjøre 86.36% av kommunegjennomsnittet i 2016 til 90.16% i 2020.
+
+Dette indikerer at selv om regionen Nord hadde lavere formue per person sammenlignet med kommunengjennomsnittet i starten av perioden, klarte den å redusere den negative differansen.
+
+### **Region Sentrum:**
+
+I perioden fra 2016 til 2020 hadde Region Sentrum lavere formue per person sammenlignet med gjennomsnittet i kommunen. Imidlertidig varierte vesktraten i løpet av denne perioden:
+
+-   I årene 2016-2017 og 2019-2020 var vekstraten høyere i regionen.
+
+-   I årene 2017-2018 opplevde både Regionen og kommunegjennomsnittet en nedgang i formueverdi. Imidlertid var nedgangen lavere i Region Sentrum.
+
+-   I år 2018-2019 opplever regionen realnedgang i motsetning til kommunegjennomsnittet.
+
+Som et resultat økte formueandelen i Regionen fra å utgjøre 102,39% av kommunegjennomsnittet i 2016 til 112,05% i 2020.
+
+Dette indikerer at selv om Region Sentrum hadde lavere formue per person sammenlignet med kommunegjennomsnittet i begynnelsen av perioden, var veksten helhetlig høyere.
+
+### **Region Vest:**
+
+I perioden fra 2016 til 2020 hadde Region Vest gjennomsnittlig høyere formue per person sammenlignet med gjennomsnittsittet i kommunen. Imidlertidig varierte vesktraten i løpet av denne perioden:
+
+-   I året 2016-2017 vekstraten høyere i Regionen.
+-   I årene 2017-2018 opplevde både Regionen og kommunegjennomsnittet en nedgang i formueverdi. Imidlertid var nedgangen mindre i Regionen.
+
+De to siste årene i perioden, 2018-2020, opplevde regionen sentrum lavere formuevekst.
+
+Som et resultat minket formueandelen i regionen fra å utgjøre utgjøre 141.07% av kommunegjennomsnittet i 2016 til 131.5% i 2020.
+
+Dette indikerer at selv om Regionen hadde høyere formue per person sammenlignet med kommunegjennomsnittet i begynnelsen av perioden, var veksten helhetlig lavere.
+
+### **Region Fastlandet:**
+
+i hele perioden fra 2016-2020, har Region fastlandet gjennomsnittelig lavere formue per person sammenlignet med gjennomsnittsnittet i kommunen. Imidlertidig varierte vesktraten i løpet av denne perioden:
+
+-   I årene 2016 - 2017 og 2019-2020 vekstraten lavere i regionen.
+
+-   I år 2017-2018 opplever regionen realnedgang i motsetning til kommunegjennomsnittet
+
+-   I året 2018-2019 var veksten høyere i regionen.
+
+Som et resultat minket formueandelen i regionen fra å utgjøre 91.18% av kommunegjennomsnittet i 2016 til 86.63% i 2020.Dette indikerer at selv om Regionen hadde høyere formue per person sammenlignet med kommunegjennomsnittet i begynnelsen av perioden, var veksten helhetlig lavere.
+
+### **Region Kvaløya:**
+
+I hele perioden fra 2016-2020, har Region Kvaløya gjennomsnittelig høyere formue per person sammenlignet med gjennomsnittsnittet i kommunen. Imidlertidig varierte vesktraten i løpet av denne perioden:
+
+-   I år 2016 - 2017 er vekstraten lavere i regionen.
+
+-   I årene 2017-2018 opplevde både regionen og kommunegjennomsnittet en nedgang i formueverdi. Imidlertid var nedgangen lavere i regionen.
+
+-   I år 2018-2019 har regionen høyere vesktrate og påfølgende år i 2019-2020 er veksten lavere.
+
+Som et resultat minket formueandelen i regionen fra å utgjøre 09.97% av kommunegjennomsnittet i 2016 til 103.13% i 2020. Dette indikerer at selv om Regionen hadde høyere formue per person sammenlignet med kommunegjennomsnittet i begynnelsen av perioden, var veksten helhetlig lavere.
+
+### Regionsammenligning:
+
+I perioden fra 2016 til 2020 var gjennomsnittlig formue i regionene Nord og Fastlandet på et sammenlignbart nivå, som utgjorde omtrent 86-91% av kommunegjennomsnittet.
+
+Regionene Sentrum og Kvaløya hadde sammenlignbare nivåer som utgjorde mellom 102-112% av kommunegjennomsnittet.
+
+Samtidig forble beboerne i Region Vest den gruppen med høyest formue. Formueandelen i regionen har blitt redusert fra å utgjøre 141.07% av kommunegjennomsnittet i 2016 til 131.5% i 2020. Formuen er betydlig høyere.
+
+### OPPGAVE 3.1:
+
+### Median 2016 og lavinntekt:
+
+```{r}
+
+#Bergene median og lavinntektsverdier og samtlige antallet som utgjør av kolonnene.
+
+Median_og_lavinntekt <- Tromsø_innbygger_register %>% 
+  group_by(År) %>% 
+  summarise(Median_etter_skatt = median(Inntekt_etter_skatt), 
+            Median_årlig_utvalg = n()) %>% 
+  mutate(Lavinntekt = (Median_etter_skatt*0.6)) 
+
+
+Lavinntektsantall <- Tromsø_innbygger_register %>% 
+    inner_join(Median_og_lavinntekt, by = "År") %>% 
+    filter(Inntekt_etter_skatt <= Lavinntekt) %>% 
+  group_by(År) %>% 
+  summarise(Lavinntekt_årlig_utvalg = n()) 
+
+```
+
+```{r}
+
+#Helhetlig data av median og lavinnteksverdier.
+Median_og_lavinntektsverdier <- Median_og_lavinntekt %>% 
+  inner_join(Lavinntektsantall, by = "År") %>%
+  mutate(Andel_av_befolkning_lavinntekt = 
+           round((Lavinntekt_årlig_utvalg/Median_årlig_utvalg)*100,2)) %>% view()
+  
+
+Median_og_lavinntektsverdier
+
+```
+
+```{r}
+
+#Graf for å illustrere Lavinntektandel for Tromsø kommune
+
+Graf_Tromsø_kommune_median_og_lavinntekt <- Median_og_lavinntektsverdier %>%  
+  ggplot(aes(x = År, y = Andel_av_befolkning_lavinntekt)) +
+  geom_point() +
+  geom_line() +
+   labs(
+    title = "Lavinntektandel for Tromsø kommune  ",
+    subtitle = "Fra perioden 2016-2020",
+    x = "År ",
+    y = "Prosentandel") 
+  
+
+Graf_Tromsø_kommune_median_og_lavinntekt
+
+
+```
+
+### Oppgave 3.1 svar:
+
+Vi har utarbeidet en graf som beregner andelen av befolkningen i Tromsø kommune med en nettoinntekt som tilsvarer eller er lavere enn lavinntektsnivået i perioden fra 2016 til 2020. Lavinntekt defineres som en inntekt som utgjør 60 % eller mindre av den årlige netto medianinntekten.
+
+I løpet av perioden 2016-2020 observerer vi en samlet nedgang i antall personer som befinner seg i denne kategorien. I 2016 befant 23,20 % seg i lavinntektsgruppen, mens tallet i 2020 hadde sunket til 22,18 %.
+
+## Oppgave 3.2:
+
+```{r}
+
+#Oppgave 3.2:
+
+Median_lavintektsgap_etter_skatt <- Median_og_lavinntekt %>%  
+  inner_join(Tromsø_innbygger_register, by = "År") %>% 
+   filter(Inntekt_etter_skatt <= Lavinntekt) %>%  
+  group_by(År) %>% 
+  summarise(Median_lavinntektsgap_etter_skatt = median(Inntekt_etter_skatt),
+            Median_lavinntektsgap_årlig_utvalg = n()) %>% 
+  inner_join(Median_og_lavinntektsverdier, by = "År") %>% view()
+  
+  
+
+Lavinntekt_utvalg <- Median_lavintektsgap_etter_skatt %>% 
+  select(År, Lavinntekt_årlig_utvalg) 
+
+  
+```
+
+```{r}
+
+#Oppgave 3.3:
+
+Median_lavintektsgap_etter_skatt <- Median_og_lavinntekt %>%  
+  inner_join(Tromsø_innbygger_register, by = "År") %>% 
+   filter(Inntekt_etter_skatt <= Lavinntekt) %>%  
+  group_by(År) %>% 
+  summarise(Median_lavinntektsgap_etter_skatt = median(Inntekt_etter_skatt),
+            Median_lavinntektsgap_årlig_utvalg = n()) %>% 
+  inner_join(Median_og_lavinntektsverdier, by = "År") %>% 
+  select(År, 
+         Median_lavinntektsgap_etter_skatt, 
+         Lavinntekt) %>%  
+  mutate(Lavinntektsgapet_gitt_prosent = 
+           round((((Lavinntekt - Median_lavinntektsgap_etter_skatt)/Lavinntekt)*100),2)) %>% view()
+  
+  
+  
+
+```
+
+```{r}
+
+Graf_median_lavintektsgap_etter_skatt <- Median_lavintektsgap_etter_skatt  %>% 
+ggplot(aes(x = År, y = Lavinntektsgapet_gitt_prosent)) +
+  geom_point() +
+  geom_line() +
+  labs(
+    title = "Lavinntektsgapet for Tromsø kommune uttrykt i prosent ",
+    subtitle = "Fra perioden 2016-2020",
+    x = "År ",
+    y = "Prosentandel") 
+
+Graf_median_lavintektsgap_etter_skatt
+  
+
+```
+
+### Oppgave 3.2 svar:
+
+Vi har utarbeidet en graf som beregner lavinntektsgapet for Tromsø kommune i perioden fra 2016 til 2020. Lavinntektsgapet omhandler forskjellen mellom inntektene til personer med lavinntekt og selve lavinntektsnivået, uttrykt som prosent. Som illustrert i grafen, kan vi observere at lavinntektsgapet var på 44.5% i 2016. Dette innebærer at halvparten av de med inntekter under lavinntektsnivået hadde inntekter tilsvarende 55.5% av lavinntektsgrensen.
+
+Fra 2016 til 2017 ser vi en reduksjon i lavinntektsgapet. Dette antyder at personer med lav inntekt opplevde høyere gjennomsnittlig inntektsvekst sammenlignet med resten av befolkningen. Imidlertid observerer vi en kontinuerlig økning i lavinntektsgapet i perioden fra 2017 til 2020. Samlet sett har det ikke vært noen nedgang i lavinntektsgapet fra 2016 til 2020, da prosentandelen fortsatt var 44.5% i 2020.
+
+# Oppgave 3.3A:
+
+```{r}
+
+#Lage en ny datasett som viser 
+Aldersgruppe_utvalg <- Tromsø_innbygger_register %>% mutate(Aldersgruppe = case_when( 
+      Alder >= 18 & Alder <= 24 ~ "18-24",
+     Alder >= 25 & Alder <= 29 ~ "25-29",
+     Alder >= 30 & Alder <= 39 ~ "30-39",
+     Alder >= 40 & Alder <= 66 ~ "40-66",
+     Alder >= 67  ~ "67+")) %>% 
+  group_by(År, Aldersgruppe) %>% 
+  summarize(Aldersgruppe_utvalg = n()) %>% 
+  inner_join(Median_og_lavinntekt, by = "År") %>%  
+  rename(Total_utvalg = Median_årlig_utvalg ) %>% 
+  select(År, 
+         Aldersgruppe,
+         Aldersgruppe_utvalg, 
+         Total_utvalg)
+
+```
+
+```{r}
+
+#Oppgave 3.3: 
+
+#Lage en ny datasett, som viser sammenheng mellom alder og median og aldersgrupper.
+
+Median_lavintektsgap_alder <- Median_og_lavinntekt %>%  
+  inner_join(Tromsø_innbygger_register, by = "År") %>%  
+  filter(Inntekt_etter_skatt <= Lavinntekt) %>%  
+  mutate(Aldersgruppe = case_when( 
+      Alder >= 18 & Alder <= 24 ~ "18-24",
+     Alder >= 25 & Alder <= 29 ~ "25-29",
+     Alder >= 30 & Alder <= 39 ~ "30-39",
+     Alder >= 40 & Alder <= 66 ~ "40-66",
+     Alder >= 67  ~ "67+")) %>%  
+  group_by(År, Aldersgruppe) %>% 
+  summarise(Gj_inntekt_etter_skatt_lavinntekt = mean(Inntekt_etter_skatt),
+            Aldersgruppe_lavinntekt_utvalg = n()) %>% 
+  inner_join(Lavinntekt_utvalg, by = "År") %>% 
+  inner_join(Aldersgruppe_utvalg, by = c("År", "Aldersgruppe")) %>% 
+  mutate(Prosent_av_lavinntektsutvalg = round(
+           (Aldersgruppe_lavinntekt_utvalg/Lavinntekt_årlig_utvalg)*100,2),
+         Prosent_av_befolkning = round((Aldersgruppe_utvalg/Total_utvalg)*100,2)) %>% 
+  arrange(Aldersgruppe) 
+  
+
+```
+
+```{r}
+
+
+#Graf av prosentvis andelen som hver aldersgruppe utgjør av lavinntektshusholdninger.
+
+Graf_lavinntekt_alder <- Median_lavintektsgap_alder %>% 
+  mutate(År = as.character(År)) %>% 
+  ggplot(mapping = aes( x = Aldersgruppe, y = Prosent_av_lavinntektsutvalg, 
+                        fill = År)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Prosentvis andelen som hver aldersgruppe utgjør av lavinntektshusholdninger",
+    subtitle = "Fra perioden 2016-2020",
+    x = "Aldersgruppe ",
+    y = "Prosentandel") +
+  scale_fill_discrete(name = "År:")
+
+
+
+```
+
+```{r}
+
+
+# Graf Prosentvis andelen som hver aldersgruppe utgjør av befolkningen i Tromsø Kommune"
+
+Graf_aldersgruppe_fordeling_befolkning <- Median_lavintektsgap_alder %>% 
+  mutate(År = as.character(År)) %>% 
+  ggplot(mapping = aes( x = Aldersgruppe, y = Prosent_av_befolkning, 
+                        fill = År)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Prosentvis andelen som hver aldersgruppe utgjør av befolkningen i
+    Tromsø Kommune",
+    subtitle = "Fra perioden 2016-2020",
+    x = "Aldersgruppe ",
+    y = "Prosentandel") +
+  scale_fill_discrete(name = "År:")
+  
+
+```
+
+```{r}
+
+#printe grafene:
+
+Graf_lavinntekt_alder
+Graf_aldersgruppe_fordeling_befolkning
+
+```
+
+### Løsning:
+
+Vi har utarbeidet to grafer. Den første grafen illustrerer den prosentvise andelen som hver aldersgruppe utgjør av lavinntektshusholdninger.
+
+Den andre grafen illustrerer den prosentvise andelen som hver aldersgruppe utgjør av befolkningen i Tromsø kommune.
+
+I perioden fra 2016 til 2020 var aldersgruppene 18-24 år og 25-29 år overrepresentert når det gjelder personer med vedvarende lavinntekt, sammenlignet med deres andel av befolkningen.
+
+Aldersgruppen 18-24 år utgjør mellom 10-12 % av befolkningen i den angitte perioden, men representerte mellom 36-39 % av personer med vedvarende lavinntekt.
+
+For aldersgruppen 25-29 år, som utgjør omtrent 9-10 % av befolkningen, utgjorde omtrent 15-17 % av personer med vedvarende lavinntekt.
+
+Vi observerte en helhetlig nedgang i lavinntekt for disse aldersgruppene, men de forblir svært overrepresentert sammenlignbart med deres befolkningsandel.
+
+De gjenværende aldersgruppene er underrepresentert sammenlignet med deres befolkningsandel. Imidlertid er det viktig å merke seg at det har vært en prosentvis økning i personer som falt under lavinntektsgrensen for de gjenværende aldersgruppene.
+
+Vi har utarbeidet to grafer. Den første grafen illustrerer den prosentvise andelen som hver region utgjør av lavinntektsandel.
+
+Den andre grafen illustrerer den prosentvise andelen som hver region utgjør av befolkningen i Tromsø kommune.
+
+I perioden fra 2016 til 2020 var det kun region Sentrum som var overrepresentert når det gjelder personer med vedvarende lavinntekt, sammenlignet med deres andel av befolkningen. Regionen utgjør i gjennomsnitt mellom 20-21% av befolkningen, men utgjør 24-25% av befolkningen med lavinntekt over tid.
+
+De resterende regionene ligger under grensen sammenlignet med deres befolkningsandel. Region Nord var underrepresentert fra 2016-2018. I perioden 2018-2020 var det flere med vedvarende lavinntekt sammenlignet med deres befolkningsandel.
+
+### Oppgave 4: Artikkel:
+
+### Buss 33 tar deg fra "Ghettoen" til Tromsøs "Beverly Hills" - en reise mellom to verdener i endring. Nye grenser blir trukket.
+
+`I USA er postnummeret "90210" synonymt med prestisje og rikdom. I Tromsø er det 9013 og 9016.`
+
+`Sosionom Nagina Gula beveger seg fra villaer med basseng og Porscher til bydeler som opplever gentrifisering og høy fattigdom.`
+
+Min bussrute begynner på Fagereng med sin naturskjønne utsikt mot Kvaløya. Vakre villaer og elegante menn, kvinner og barn med dyre og luksuriøse merkeklær pryder fortauet.
+
+Etter et par stasjoner ankommer jeg sentrum og fortsetter reisen videre nordover. Jo lengre nord bussen kjører, desto mer forandrer scenen seg. Villaene blir erstattet med rekkehus og slitte leiligheter fra 80-tallet. Vinterjakkene på ungdommen byttes ut fra franske merkenavn til billigkjeder som H&M og Cubus. Men det er sakte endringer i disse områdene.
+
+Det er ikke sceneforandringen som plager meg, men den økte fattigdommen og klasseskillene. I Tromsø by har vi ikke fysiske grenser, men bydelene deler de rike og fattige i en såkalt økonomisk apartheid. Men vi ser endringer, spørsmålet er for hvem og hva?
+
+Byen kan også skryte av en av landets høyeste boligpriser. Tross alt er vi i Nordens Paris. Vil sentrumsregionen og den nordlige delen av Tromsøya møte samme skjebne som Opera-distriktet i Paris? Tidligere arbeiderklassedistrikt, men nå en gentrifisert bydel der fattige presses ut. Eller Grünerløkka i Oslo, hvor fattige og rike bor side om side.
+
+Tromsø og sentrumsregionen er ingen unntak, gentrefiseringen kommer sikkert men sakte.
+
+I perioden 2016-2020 var sentrumsregionen overrepresentert med personer som levde i vedvarende lavinntekt.
+
+Gjennomsnittsinntekten er lavere sammenlignet med kommunegjennomsnittet. I 2016 hadde sentrumsregionen den høyeste formueveksten i hele Tromsø by, med 18%. I perioden fra 2016-2020 overtok regionen Kvaløya med nest høyest formue.
+
+I Norge er formue sterkt knyttet til bolig og boligpriser. Og pensjonister blir rikere og rikere.
+
+Med en ny generasjon som skal innta boligmarkedet, blir veien lengre og tyngre. Tidligere arbeiderklassehjem er nå for dyre for vanlige folk. Vi hører historiene til vanlige oppegående mennesker med fulltidsjobber, men ingen lykke i boligmarkedet.
+
+Ville "Landsfaderen" ha snudd seg i graven? I en sosialdemokratisk by som Tromsø. Arbeiderpartiet vant tross alt makten for 4 nye år.
+
+Tromsø og Norge er flott!
+
+Fantastisk natur, et velfungerende helsevesen, og et utdanningssystem som er blant de beste i verden. Men for de som ønsker et sikkerhetsnett og en bolig å kalle hjem, lider de i stillhet.
